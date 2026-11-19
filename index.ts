@@ -3,6 +3,7 @@ import { Job } from "node-schedule";
 import type { CommandModule } from "../../lib/commands.ts";
 import { teamGuides } from "./team-guides.ts";
 import { createTeamResources } from "./team-resources.ts";
+import { createRoleGuides } from "./role-guides.ts";
 
 type TeamResources = ReturnType<typeof createTeamResources>;
 
@@ -10,6 +11,7 @@ export function createGuidesModule(options: {
   readonly directory: string;
   readonly forward?: boolean;
   readonly resources?: TeamResources;
+  readonly roleGuides?: ReturnType<typeof createRoleGuides>;
 }): CommandModule {
   const { resources } = options;
   const refresh = (force: boolean) => async (argument: string, { isMaster }: { isMaster: boolean }) => {
@@ -31,6 +33,8 @@ export function createGuidesModule(options: {
     },
     async fallback(message, { normalizedMessage }) {
       const command = normalizedMessage || message;
+      const roleGuide = options.roleGuides?.(command);
+      if (roleGuide !== undefined) return roleGuide;
       if (/^#(?:星铁|绝区零)/u.test(command)) return;
       const query = /^#(\S+)配队$/u.exec(command)?.[1];
       if (!query || query.includes("深渊")) return;
@@ -77,17 +81,25 @@ const root = fileURLToPath(new URL("../../data/guides/mora/", import.meta.url));
 export function createModule({ signal }: { signal: AbortSignal }) {
   const directory = Bun.env.LOTUS_GUIDES_TEAM_DIR?.trim();
   const forward = Bun.env.LOTUS_GUIDES_FORWARD !== "0";
-  if (directory) return createGuidesModule({ directory, forward });
   const controller = new AbortController();
   const refreshSignal = AbortSignal.any([signal, controller.signal]);
-  const resources = createTeamResources({ root, fallback: legacyDirectory, signal: refreshSignal });
-  const stop = Bun.env.LOTUS_GUIDES_AUTO_UPDATE === "0" ? undefined : startTeamResourceRefresh(resources, refreshSignal);
+  const data = (path: string) => fileURLToPath(new URL(path, import.meta.url));
+  const roleGuides = createRoleGuides({
+    cache: Bun.env.LOTUS_GUIDES_ROLE_DIR?.trim() || data("../../data/guides/roleGuides/"),
+    config: Bun.env.LOTUS_GUIDES_ROLE_CONFIG_DIR?.trim() || data("../../config/guides/"),
+    atlas: Bun.env.LOTUS_GUIDES_LEGACY_ATLAS_DIR?.trim() || data("../../data/guides/legacy-atlas/"),
+    moraPack: Bun.env.LOTUS_GUIDES_MORA_PACK_DIR?.trim() || data("../../data/guides/mora-plugin-res/"),
+    legacyStrategies: [data("../../temp/strategy/"), data("../../data/strategy/")],
+    signal: refreshSignal, forward,
+  });
+  const resources = directory ? undefined : createTeamResources({ root, fallback: legacyDirectory, signal: refreshSignal });
+  const stop = !resources || Bun.env.LOTUS_GUIDES_AUTO_UPDATE === "0" ? undefined : startTeamResourceRefresh(resources, refreshSignal);
   return {
-    ...createGuidesModule({ directory: legacyDirectory, forward, resources }),
+    ...createGuidesModule({ directory: directory ?? legacyDirectory, forward, resources, roleGuides }),
     async dispose() {
       controller.abort();
       if (stop) await stop();
-      else await resources.wait();
+      else await resources?.wait();
     },
   };
 }

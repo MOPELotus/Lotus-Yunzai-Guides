@@ -81,7 +81,7 @@ function searchTeams(teams: TeamIndex, query: string) {
   };
 }
 
-async function readResource(root: string, file: string, limit: number): Promise<Buffer> {
+export async function readResource(root: string, file: string, limit: number): Promise<Buffer> {
   const path = await realpath(file);
   const rel = relative(root, path);
   if (!rel || isAbsolute(rel) || rel === ".." || rel.startsWith(`..${sep}`)) {
