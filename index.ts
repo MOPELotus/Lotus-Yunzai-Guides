@@ -4,6 +4,7 @@ import type { CommandModule } from "../../lib/commands.ts";
 import { teamGuides } from "./team-guides.ts";
 import { createTeamResources } from "./team-resources.ts";
 import { createRoleGuides } from "./role-guides.ts";
+import { createRoleReferences } from "./role-references.ts";
 
 type TeamResources = ReturnType<typeof createTeamResources>;
 
@@ -12,6 +13,7 @@ export function createGuidesModule(options: {
   readonly forward?: boolean;
   readonly resources?: TeamResources;
   readonly roleGuides?: ReturnType<typeof createRoleGuides>;
+  readonly roleReferences?: ReturnType<typeof createRoleReferences>;
 }): CommandModule {
   const { resources } = options;
   const refresh = (force: boolean) => async (argument: string, { isMaster }: { isMaster: boolean }) => {
@@ -33,7 +35,7 @@ export function createGuidesModule(options: {
     },
     async fallback(message, { normalizedMessage }) {
       const command = normalizedMessage || message;
-      const roleGuide = options.roleGuides?.(command);
+      const roleGuide = options.roleReferences?.(command) ?? options.roleGuides?.(command);
       if (roleGuide !== undefined) return roleGuide;
       if (/^#(?:星铁|绝区零)/u.test(command)) return;
       const query = /^#(\S+)配队$/u.exec(command)?.[1];
@@ -84,18 +86,20 @@ export function createModule({ signal }: { signal: AbortSignal }) {
   const controller = new AbortController();
   const refreshSignal = AbortSignal.any([signal, controller.signal]);
   const data = (path: string) => fileURLToPath(new URL(path, import.meta.url));
-  const roleGuides = createRoleGuides({
+  const guideOptions = {
     cache: Bun.env.LOTUS_GUIDES_ROLE_DIR?.trim() || data("../../data/guides/roleGuides/"),
     config: Bun.env.LOTUS_GUIDES_ROLE_CONFIG_DIR?.trim() || data("../../config/guides/"),
     atlas: Bun.env.LOTUS_GUIDES_LEGACY_ATLAS_DIR?.trim() || data("../../data/guides/legacy-atlas/"),
     moraPack: Bun.env.LOTUS_GUIDES_MORA_PACK_DIR?.trim() || data("../../data/guides/mora-plugin-res/"),
     legacyStrategies: [data("../../temp/strategy/"), data("../../data/strategy/")],
     signal: refreshSignal, forward,
-  });
+  };
+  const roleGuides = createRoleGuides(guideOptions);
+  const roleReferences = createRoleReferences(guideOptions);
   const resources = directory ? undefined : createTeamResources({ root, fallback: legacyDirectory, signal: refreshSignal });
   const stop = !resources || Bun.env.LOTUS_GUIDES_AUTO_UPDATE === "0" ? undefined : startTeamResourceRefresh(resources, refreshSignal);
   return {
-    ...createGuidesModule({ directory: directory ?? legacyDirectory, forward, resources, roleGuides }),
+    ...createGuidesModule({ directory: directory ?? legacyDirectory, forward, resources, roleGuides, roleReferences }),
     async dispose() {
       controller.abort();
       if (stop) await stop();

@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import type { CommandReply } from "../../lib/commands.ts";
 import { parseGuideCommand } from "./role-guide-input.ts";
 import { createRoleGuides } from "./role-guides.ts";
+import { createRoleReferences } from "./role-references.ts";
 
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X9uoAAAAASUVORK5CYII=", "base64");
 const image = (name: string) => Buffer.concat([png, Buffer.from(name)]);
@@ -31,6 +32,13 @@ test("三游戏保留旧攻略命令、配置源、本地覆盖及旧 Atlas，�
     await put("upstream/StarRail/Roles/Guides/Asgater/丹恒•腾荒.png", image("腾荒包"));
     await put("upstream/StarRail/Roles/Guides/Asgater/丹恒.png", image("丹恒包"));
     await put("upstream/ZenlessZoneZero/Roles/Guides/Asgater/艾莲.png", image("艾莲包"));
+    await put("upstream/Genshin/Roles/RefStat/钟离.png", image("钟离参考面板"));
+    await put("upstream/Genshin/Roles/YieldCurve/钟离.png", image("钟离收益曲线"));
+    await put("upstream/Genshin/Roles/YieldCurve/帮助.png", image("收益曲线帮助"));
+    await put("upstream/Genshin/Roles/RefStat/RefNotes.yaml", "url: https://www.miyoushe.com/ys/article/123\n钟离: {mainProp: 生命沙, viceProp: 生命, brief: 配装参考}\n");
+    await put("upstream/StarRail/Roles/RefStat/罗刹.png", image("罗刹参考面板"));
+    await put("upstream/StarRail/Roles/RefStat/帮助.png", image("星铁参考面板帮助"));
+    await put("upstream/StarRail/Roles/RefStat/RefNotes.yaml", "url: https://www.miyoushe.com/sr/article/456\n");
     await put("atlas/star-rail-atlas/guide for role/1310.png", image("流萤旧 Atlas"));
     await put("atlas/zzz-atlas/角色攻略/艾莲.png", image("艾莲旧 Atlas"));
     await put("roleGuides/add_ons/Asgater/钟离.jpg", image("钟离本地覆盖"));
@@ -91,6 +99,7 @@ olds: [{source: 西风驿站, collection_id: [4]}]
       cache, legacyStrategies: [join(root, "oldStrategy")], atlas: join(root, "atlas"), config: join(root, "config"),
       moraSource: pathToFileURL(gitRoot).href, fetch: transport,
     });
+    const reference = createRoleReferences({ cache, moraSource: pathToFileURL(gitRoot).href });
     expect(await search("岩王帝君攻略")).toEqual(forwarded("钟离攻略~", "钟离本地覆盖", "1.png", "341523.png", "钟离旧缓存"));
     expect(await search("#星铁萨姆一图流")).toEqual(forwarded("流萤攻略~", "流萤旧 Atlas", "2.png"));
     expect(requested).not.toContain("5");
@@ -101,6 +110,16 @@ olds: [{source: 西风驿站, collection_id: [4]}]
     expect(await search("#星铁开拓者攻略")).toContain("请选择");
     expect(await search("#旅行者攻略")).toContain("草主攻略");
     expect(await search("#钟离进阶攻略")).toBeUndefined();
+    expect(await reference("#钟离进阶攻略")).toEqual({
+      type: "forward",
+      nodes: [
+        "钟离进阶参考 @blue菌hehe", [part("钟离参考面板"), "https://www.miyoushe.com/ys/article/123"],
+        "圣遗物思路推荐：\n主词条：生命沙\n副词条：生命", part("钟离收益曲线"), "【蓝佬小课堂】：\n配装参考",
+      ],
+    });
+    expect(await reference("#星铁罗刹参考面板")).toEqual([part("罗刹参考面板"), "https://www.miyoushe.com/sr/article/456"]);
+    expect(await reference("#收益曲线帮助")).toEqual(expect.arrayContaining([part("收益曲线帮助")]));
+    expect(await reference("#星铁参考面板帮助")).toEqual(expect.arrayContaining([part("星铁参考面板帮助")]));
     expect(requested).not.toContain("4");
     expect(requested).not.toContain("6");
     expect(await readFile(join(cache, "作者/钟离.jpg"))).toEqual(image("1.png"));

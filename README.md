@@ -8,6 +8,8 @@
 
 要沿用原有合集配置，将 `roleGuides.yaml`、`srRoleGuides.yaml` 和 `zzzRoleGuides.yaml` 放进 `config/guides/`。也可用 `LOTUS_GUIDES_ROLE_CONFIG_DIR` 指定旧插件的配置目录。旧 `temp/strategy/` 与 `data/strategy/` 中的原神图可以继续读。旧 Atlas 目录可用 `LOTUS_GUIDES_LEGACY_ATLAS_DIR` 指定，已有 Mora 资源包可用 `LOTUS_GUIDES_MORA_PACK_DIR` 指定，供原站访问失败时读取。
 
+`#钟离进阶参考`、`#钟离收益曲线` 和 `*罗刹参考面板` 会一起读旧资源库的图和作者说明。原神用 `#收益曲线帮助`，星铁用 `*参考面板帮助`。
+
 ## 原神配队
 
 发送 `#绫人配队`、`#神鹤万心配队` 或 `#万达配队`。支持用队名、队伍别名和角色别名查询。只有一张图时直接发送，多张图时合并转发。若希望把多张图放在同一条普通消息中，启动时设置 `LOTUS_GUIDES_FORWARD=0`。

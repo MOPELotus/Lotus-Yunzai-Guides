@@ -1,14 +1,26 @@
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { lockFile } from "../../lib/file-lock.ts";
 import { guideGames, safeGuideName, type GuideGame } from "./role-guide-input.ts";
-import { findGuidePack, isGuideImage, matchesGuideImage, readGuideImage, roleImageLimit, writeGuideFile, type GuideImage } from "./role-image-files.ts";
+import { findGuidePack, isGuideImage, matchesGuideImage, readGuideFile, roleImageLimit, writeGuideFile, type GuideImage } from "./role-image-files.ts";
 import { fetchMoraBlobs, moraSourceRef, moraTeamSource, prepareMoraGit } from "./team-resources.ts";
 
 const revision = /^[0-9a-f]{40}$/u;
 type Blob = { readonly source: string; readonly hash: string };
 type RolePack = { readonly checkedAt: number; readonly files: readonly Blob[]; readonly images: readonly GuideImage[] };
 const refreshAfter = 24 * 60 * 60 * 1000;
+export const referenceNotes = "RefStat:RefNotes.yaml";
+const notesLimit = 128 * 1024;
+
+function validFile(source: string, bytes: Buffer): boolean {
+  if (source !== referenceNotes) return isGuideImage(bytes);
+  try {
+    const data: unknown = Bun.YAML.parse(bytes.toString("utf8"));
+    return !!data && typeof data === "object" && !Array.isArray(data);
+  } catch {
+    return false;
+  }
+}
 
 async function readPack(directory: string): Promise<RolePack | undefined> {
   try {
@@ -17,12 +29,37 @@ async function readPack(directory: string): Promise<RolePack | undefined> {
     const images: GuideImage[] = [];
     for (const { source, hash } of files) {
       if (typeof source !== "string" || !safeGuideName(source) || typeof hash !== "string" || !revision.test(hash)) return;
-      const bytes = await readGuideImage(directory, hash);
-      if (!bytes) return;
+      const bytes = await readGuideFile(directory, hash, source === referenceNotes ? notesLimit : roleImageLimit);
+      if (!bytes || !validFile(source, bytes)) return;
       images.push({ source, bytes });
     }
     return { checkedAt, files, images };
   } catch {}
+}
+
+function referenceSource(game: GuideGame, name: string, category: string, file: string): string | undefined {
+  if (category !== "RefStat" && (game !== "gs" || category !== "YieldCurve")) return;
+  if (name === "帮助") {
+    if (file !== "帮助.png" || category !== (game === "sr" ? "RefStat" : "YieldCurve")) return;
+  } else if (!(category === "RefStat" && file === "RefNotes.yaml") &&
+      !matchesGuideImage(file, name) && !(file.startsWith(name + "-") && /\.png$/u.test(file))) {
+    return;
+  }
+  return `${category}:${file}`;
+}
+
+async function readReferenceFallback(root: string, game: GuideGame, name: string) {
+  const results: GuideImage[] = [];
+  for (const category of ["RefStat", "YieldCurve"]) {
+    for (const file of await readdir(join(root, category)).catch(() => [] as string[])) {
+      if (!safeGuideName(file)) continue;
+      const source = referenceSource(game, name, category, file);
+      if (!source) continue;
+      const bytes = await readGuideFile(root, join(category, file), source === referenceNotes ? notesLimit : roleImageLimit);
+      if (bytes && validFile(source, bytes)) results.push({ source, bytes });
+    }
+  }
+  return results;
 }
 
 export function createMoraRolePack(options: {
@@ -30,6 +67,7 @@ export function createMoraRolePack(options: {
   readonly fallback?: string;
   readonly upstream?: string;
   readonly signal?: AbortSignal;
+  readonly references?: boolean;
 }) {
   const pending = new Map<string, Promise<readonly GuideImage[]>>();
   async function read(game: GuideGame, name: string, force: boolean): Promise<readonly GuideImage[]> {
@@ -49,17 +87,20 @@ export function createMoraRolePack(options: {
         if (!force && current && Date.now() - current.checkedAt < refreshAfter) return current.images;
         temporary = await mkdtemp(join(directory, ".refresh-"));
         const git = await prepareMoraGit(temporary, options.upstream ?? moraTeamSource, signal);
-        const path = `${gamePath}/Roles/Guides`;
-        const index = (await git(["ls-tree", "-r", "-z", moraSourceRef, "--", path])).toString("utf8");
+        const path = options.references ? `${gamePath}/Roles` : `${gamePath}/Roles/Guides`;
+        const paths = options.references ? [`${path}/RefStat`, `${path}/YieldCurve`] : [path];
+        const index = (await git(["ls-tree", "-r", "-z", moraSourceRef, "--", ...paths])).toString("utf8");
         const files = new Map<string, string>();
         for (const line of index.split("\0")) {
           const [metadata, file] = line.split("\t", 2);
           if (!file?.startsWith(path + "/")) continue;
           const [author, namePart, ...rest] = file.slice(path.length + 1).split("/");
-          if (!author || !safeGuideName(author) || !namePart || rest.length || !matchesGuideImage(namePart, name) || files.has(author)) continue;
+          if (!author || !safeGuideName(author) || !namePart || !safeGuideName(namePart) || rest.length) continue;
+          const source = options.references ? referenceSource(game, name, author, namePart) : matchesGuideImage(namePart, name) ? author : undefined;
+          if (!source || files.has(source)) continue;
           const hash = /^100644 blob ([0-9a-f]{40})$/u.exec(metadata ?? "")?.[1];
           if (!hash) throw new Error("摩拉角色攻略原图格式无效。");
-          files.set(author, hash);
+          files.set(source, hash);
         }
         if (files.size > 24) throw new Error("角色攻略来源数超限。");
         const missing = [...new Set(files.values())].filter((hash) => !current?.files.some((file) => file.hash === hash));
@@ -70,10 +111,11 @@ export function createMoraRolePack(options: {
         for (const [source, hash] of files) {
           let bytes = cached.get(hash);
           if (!bytes) {
+            const limit = source === referenceNotes ? notesLimit : roleImageLimit;
             const size = Number((await git(["cat-file", "-s", hash])).toString().trim());
-            if (!Number.isSafeInteger(size) || size < 1 || size > roleImageLimit) throw new Error("角色攻略原图大小无效。");
-            bytes = await git(["cat-file", "blob", hash], undefined, roleImageLimit);
-            if (bytes.byteLength !== size || !isGuideImage(bytes)) throw new Error("角色攻略原图不完整。");
+            if (!Number.isSafeInteger(size) || size < 1 || size > limit) throw new Error("角色攻略资源大小无效。");
+            bytes = await git(["cat-file", "blob", hash], undefined, limit);
+            if (bytes.byteLength !== size || !validFile(source, bytes)) throw new Error("角色攻略资源不完整。");
             await writeGuideFile(join(directory, hash), bytes);
           }
           total += bytes.byteLength;
@@ -97,7 +139,9 @@ export function createMoraRolePack(options: {
         console.warn("[guides] 摩拉角色攻略资源无法刷新，保留已有原图。", error.message);
       }
       if (existing?.images.length) return existing.images;
-      return options.fallback ? findGuidePack(join(options.fallback, gamePath, "Roles", "Guides"), name) : [];
+      if (!options.fallback) return [];
+      const local = join(options.fallback, gamePath, "Roles");
+      return options.references ? readReferenceFallback(local, game, name) : findGuidePack(join(local, "Guides"), name);
     }
   }
 

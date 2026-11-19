@@ -12,12 +12,16 @@ export function isGuideImage(bytes: Buffer): boolean {
     (bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP"));
 }
 
-export async function readGuideImage(root: string, file: string): Promise<Buffer | undefined> {
+export async function readGuideFile(root: string, file: string, limit: number): Promise<Buffer | undefined> {
   try {
     const base = await realpath(root);
-    const bytes = await readResource(base, join(base, file), roleImageLimit);
-    if (isGuideImage(bytes)) return bytes;
+    return await readResource(base, join(base, file), limit);
   } catch {}
+}
+
+export async function readGuideImage(root: string, file: string): Promise<Buffer | undefined> {
+  const bytes = await readGuideFile(root, file, roleImageLimit);
+  if (bytes && isGuideImage(bytes)) return bytes;
 }
 
 export async function writeGuideFile(file: string, bytes: string | Uint8Array) {
