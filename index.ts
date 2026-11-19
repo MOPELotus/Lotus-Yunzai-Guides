@@ -95,6 +95,7 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
     register(policy: CalendarSchedule): () => void;
     registerTask: CalendarScheduleOptions["register"];
     targets: CalendarScheduleOptions["targets"];
+    whenReady(start: () => void): () => void;
   };
 }) {
   const directory = Bun.env.LOTUS_GUIDES_TEAM_DIR?.trim();
@@ -133,11 +134,15 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
     },
   });
   const unregister = scheduled && !refreshSignal.aborted ? guidesSchedule?.register(scheduled) : undefined;
-  const stop = !resources || Bun.env.LOTUS_GUIDES_AUTO_UPDATE === "0" ? undefined : startTeamResourceRefresh(resources, refreshSignal);
+  let stop: ReturnType<typeof startTeamResourceRefresh> | undefined;
+  const cancelStart = resources && Bun.env.LOTUS_GUIDES_AUTO_UPDATE !== "0" && guidesSchedule?.whenReady(() => {
+    if (!refreshSignal.aborted) stop = startTeamResourceRefresh(resources, refreshSignal);
+  });
   return {
     ...createGuidesModule({ directory: directory ?? legacyDirectory, forward, resources, roleGuides, roleReferences, starrailCalendar, genshinCalendar, zzzCalendar }),
     async dispose() {
       controller.abort();
+      if (cancelStart) cancelStart();
       unregister?.();
       await scheduled?.stop();
       if (stop) await stop();
