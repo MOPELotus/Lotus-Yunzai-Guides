@@ -1,11 +1,13 @@
 import { fileURLToPath } from "node:url";
 import { Job } from "node-schedule";
 import type { CommandModule } from "../../lib/commands.ts";
+import type { MessageSegment } from "../../lib/messages.ts";
 import { teamGuides } from "./team-guides.ts";
 import { createTeamResources } from "./team-resources.ts";
 import { createRoleGuides } from "./role-guides.ts";
 import { createRoleReferences } from "./role-references.ts";
 import { createGenshinCalendar, createStarrailCalendar, createZzzCalendar } from "./calendar.ts";
+import { createCalendarSchedule, type CalendarSchedule, type CalendarScheduleOptions } from "./calendar-schedule.ts";
 
 type TeamResources = ReturnType<typeof createTeamResources>;
 
@@ -86,7 +88,15 @@ export function startTeamResourceRefresh(resources: TeamResources, signal: Abort
 const legacyDirectory = fileURLToPath(new URL("../../data/guides/Genshin/TeamGuides/", import.meta.url));
 const root = fileURLToPath(new URL("../../data/guides/mora/", import.meta.url));
 
-export function createModule({ signal }: { signal: AbortSignal }) {
+export async function createModule({ signal, lockFile, guidesSchedule }: {
+  readonly signal: AbortSignal;
+  readonly lockFile: CalendarScheduleOptions["lockFile"];
+  readonly guidesSchedule?: {
+    register(policy: CalendarSchedule): () => void;
+    registerTask: CalendarScheduleOptions["register"];
+    targets: CalendarScheduleOptions["targets"];
+  };
+}) {
   const directory = Bun.env.LOTUS_GUIDES_TEAM_DIR?.trim();
   const forward = Bun.env.LOTUS_GUIDES_FORWARD !== "0";
   const controller = new AbortController();
@@ -106,11 +116,30 @@ export function createModule({ signal }: { signal: AbortSignal }) {
   const genshinCalendar = createGenshinCalendar({ signal: refreshSignal });
   const zzzCalendar = createZzzCalendar({ signal: refreshSignal });
   const resources = directory ? undefined : createTeamResources({ root, fallback: legacyDirectory, signal: refreshSignal });
+  const scheduled = guidesSchedule && await createCalendarSchedule({
+    signal: refreshSignal, root: new URL("../../", import.meta.url), lockFile,
+    register: guidesSchedule.registerTask, targets: guidesSchedule.targets,
+    async render(type, active) {
+      const replies = await Promise.all([
+        type === "S" ? undefined : createGenshinCalendar({ signal: active })("#日历"),
+        type === "G" ? undefined : createStarrailCalendar({ signal: active })("#星铁日历"),
+      ]);
+      const images = replies.filter((reply): reply is Extract<MessageSegment, { type: "image" }> =>
+        typeof reply === "object" && reply !== null && "type" in reply && reply.type === "image" && "file" in reply);
+      if (images.length === (type === "*" ? 2 : 1)) return images;
+    },
+    report(stage, outcome) {
+      console.warn(`[guides] 定时日历 ${stage} ${outcome === "unknown" ? "结果待核对" : "失败"}。`);
+    },
+  });
+  const unregister = scheduled && !refreshSignal.aborted ? guidesSchedule?.register(scheduled) : undefined;
   const stop = !resources || Bun.env.LOTUS_GUIDES_AUTO_UPDATE === "0" ? undefined : startTeamResourceRefresh(resources, refreshSignal);
   return {
     ...createGuidesModule({ directory: directory ?? legacyDirectory, forward, resources, roleGuides, roleReferences, starrailCalendar, genshinCalendar, zzzCalendar }),
     async dispose() {
       controller.abort();
+      unregister?.();
+      await scheduled?.stop();
       if (stop) await stop();
       else await resources?.wait();
     },
