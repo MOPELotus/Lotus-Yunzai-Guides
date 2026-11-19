@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { renderPng } from "@lotus-yunzai/skia";
 import { FontLibrary, loadImage, type CanvasRenderingContext2D as Context, type Image } from "skia-canvas";
 import { readGuideImage } from "./role-image-files.ts";
-import { officialCalendarImage, type CalendarData, type CalendarKind, type CalendarRow } from "./starrail-calendar-data.ts";
+import { officialCalendarImage, type CalendarGame, type CalendarData, type CalendarKind, type CalendarRow } from "./calendar-data.ts";
+import { genshinCalendarExtras, genshinCalendarMaterial, genshinCalendarPortrait } from "./genshin-calendar-theme.ts";
 
 const day = 86_400_000;
 const china = 8 * 3_600_000;
@@ -14,6 +15,8 @@ const fontName = "LotusCalendarMiao";
 const numberFont = "LotusCalendarNumbers";
 const loadedFonts = new Set<string>();
 const challengeTheme: Partial<Record<CalendarKind, { color: string; image: string }>> = {
+  abyss: { color: "#333465", image: "abyss.jpg" },
+  newAbyss: { color: "#1a3061", image: "newAbyss.jpg" },
   "abyss-1": { color: "#0f0829", image: "abyss-1.jpg" },
   "abyss-2": { color: "#16202a", image: "abyss-2.jpg" },
   "abyss-3": { color: "#0f0829", image: "abyss-1.jpg" },
@@ -96,13 +99,15 @@ function text(c: Context, value: string, x: number, y: number, size: number, col
   c.fillText(value, x, y);
 }
 
-function packedRows(rows: readonly CalendarRow[], timeline: boolean) {
+function packedRows(rows: readonly CalendarRow[], timeline: boolean, genshin: boolean) {
   const lines: CalendarRow[][] = [];
   const used = new Set<CalendarRow>();
   for (const row of rows) {
     if (used.has(row)) continue;
-    const partner = timeline && row.kind === "activity"
-      ? rows.find((item) => !used.has(item) && item.kind === "activity" && row.end <= item.start)
+    const mergeable = row.kind === "activity" || row.kind === "normal" ||
+      (genshin && (row.kind === "character" || row.kind === "weapon"));
+    const partner = timeline && mergeable
+      ? rows.find((item) => !used.has(item) && item.kind === row.kind && row.end <= item.start)
       : undefined;
     if (partner) used.add(partner);
     lines.push(partner ? [row, partner] : [row]);
@@ -110,19 +115,35 @@ function packedRows(rows: readonly CalendarRow[], timeline: boolean) {
   return lines;
 }
 
-export async function renderStarrailCalendar(data: CalendarData, mode: "calendar" | "list", options: {
+export async function renderCalendar(data: CalendarData, mode: "calendar" | "list", options: {
+  readonly game: CalendarGame;
   readonly themeDirectory?: string;
   readonly fetch?: typeof fetch;
   readonly signal?: AbortSignal;
-} = {}) {
+}) {
   const timeline = mode === "calendar";
   const width = timeline ? 996 : 740;
   const panel = width - 40;
-  const rows = packedRows(data.rows, timeline);
-  const header = timeline ? 80 : 40;
-  const panelHeight = Math.max(400, header + rows.length * 76 + 15);
-  const height = panelHeight + 103;
+  const gs = options.game === "genshin";
+  const rows = packedRows(data.rows, timeline, gs);
   const source = options.themeDirectory && await realpath(options.themeDirectory).catch(() => undefined);
+  const extras = gs && source ? await genshinCalendarExtras(source, data.start, data.now) : undefined;
+  const births = timeline ? extras?.birthdays ?? [] : [];
+  const birthdays = 74 * Math.max(0, ...births.map((entries) => entries.length));
+  const headerHeight = timeline ? 80 : 40;
+  const header = headerHeight + birthdays;
+  const rowPositions: number[] = [];
+  let heightOfRows = 0;
+  for (const line of rows) {
+    rowPositions.push(heightOfRows);
+    heightOfRows += line.every((row) => row.kind === "normal") ? 48 : 76;
+  }
+  const panelHeight = Math.max(400, header + heightOfRows + 15);
+  const footer = panelHeight + 103;
+  const talentCards = extras?.materials.flatMap(({ name, region, roles, item, color }) =>
+    roles.map((role, index) => ({ role, title: index === 0 ? `${region}·${name}` : undefined, item, color, groupSize: roles.length }))) ?? [];
+  const talentsPerRow = Math.floor((width - 30) / 87);
+  const height = footer + (talentCards.length ? Math.ceil(talentCards.length / talentsPerRow) * 109 + 16 : 0);
   let family = "Noto Sans CJK SC";
   if (source) {
     for (const [name, file] of [[fontName, "HYWH-65W.ttf"], [numberFont, "tttgbnumber.ttf"]] as const) {
@@ -139,16 +160,28 @@ export async function renderStarrailCalendar(data: CalendarData, mode: "calendar
   }
   const urls = [...new Set(data.rows.flatMap(({ banner, icon }) => [banner, icon]).filter((item): item is string => !!item))];
   const transport = options.fetch ?? fetch;
-  const [background, icon, challenges, remote] = await Promise.all([
-    themeImage(source, "common/bg/bg-sr.webp"), themeImage(source, "wiki/imgs/calendar-icon.png"),
+  const characterFiles = [
+    ...births.flat().map((role) => genshinCalendarPortrait(role.name, "face")),
+    ...data.rows.flatMap(({ character }) => character ? [genshinCalendarPortrait(character, "face"), genshinCalendarPortrait(character, "card")] : []),
+    ...talentCards.flatMap(({ role, item, title }) => [
+      genshinCalendarPortrait(role.name, "face"), title ? genshinCalendarMaterial(item, "talent") : undefined,
+      role.weekly ? genshinCalendarMaterial(role.weekly, "weekly") : undefined,
+    ]),
+  ].filter((item): item is string => !!item);
+  const [background, icon, challenges, remote, genshin] = await Promise.all([
+    themeImage(source, gs ? "common/bg/bg-hydro.webp" : "common/bg/bg-sr.webp"), themeImage(source, "wiki/imgs/calendar-icon.png"),
     Promise.all(Object.values(challengeTheme).map(async ({ image }) => [image, await themeImage(source, "wiki/imgs/" + image)] as const)),
     Promise.all(urls.map(async (url) => [url, await webImage(url, transport, options.signal)] as const)),
+    Promise.all([...new Set(characterFiles)].map(async (path) => [path, await themeImage(source, path)] as const)),
   ]);
   const media = new Map(remote);
   const local = new Map(challenges);
+  const things = new Map(genshin);
+  const portrait = (name: string | undefined, type: "face" | "card") => name ? things.get(genshinCalendarPortrait(name, type) ?? "") : undefined;
+  const localMaterial = (name: string, type: "talent" | "weekly") => things.get(genshinCalendarMaterial(name, type) ?? "");
   return renderPng(Math.ceil(width * scale), Math.ceil(height * scale), (c) => {
     c.scale(scale, scale);
-    c.fillStyle = "#181a31";
+    c.fillStyle = gs ? "#16243c" : "#181a31";
     c.fillRect(0, 0, width, height);
     if (background) c.drawImage(background, 0, 0, width, height);
     c.fillStyle = "#0009";
@@ -158,7 +191,7 @@ export async function renderStarrailCalendar(data: CalendarData, mode: "calendar
     c.fillStyle = "#0007";
     c.fillRect(20, 30, panel, panelHeight);
     c.fillStyle = "#000c";
-    c.fillRect(20, 30, panel, header);
+    c.fillRect(20, 30, panel, headerHeight);
     c.strokeStyle = "#ffffff39";
     c.lineWidth = 1;
     c.strokeRect(20.5, 30.5, panel - 1, panelHeight - 1);
@@ -183,6 +216,16 @@ export async function renderStarrailCalendar(data: CalendarData, mode: "calendar
         text(c, `周${weekdays[cell.getUTCDay()]}`, x + column / 2, 104, 11, i === current ? "#141414" : "#aaa", family, "center");
         c.fillStyle = "#ffffff44";
         c.fillRect(x, 70, 1, panelHeight - 40);
+        for (const [index, role] of (births[i] ?? []).entries()) {
+          const image = portrait(role.name, "face");
+          const y = 115 + index * 74;
+          c.fillStyle = role.star === 5 ? "#9c6b44" : "#645088";
+          c.fillRect(x + 7, y, column - 14, 64);
+          if (image) cover(c, image, x + 7, y, column - 14, 49);
+          c.fillStyle = "#e8e2d8";
+          c.fillRect(x + 7, y + 49, column - 14, 15);
+          text(c, role.short.length >= 4 ? role.short : role.short + "生日", x + column / 2, y + 61, 10, "#25272b", family, "center", column - 18);
+        }
       }
     } else {
       text(c, "活动列表", width / 2, 57, 19, "#d3bc8d", family, "center");
@@ -197,26 +240,31 @@ export async function renderStarrailCalendar(data: CalendarData, mode: "calendar
       const start = timeline ? Math.max(0, (row.start - data.start) / (13 * day)) : 0;
       const end = timeline ? Math.min(1, (row.end - data.start) / (13 * day)) : 1;
       const x = 20 + start * panel + 8;
-      const y = 30 + header + 14 + i * 76;
+      const y = 30 + header + 14 + (rowPositions[i] ?? 0);
       const w = Math.max(4, (end - start) * panel - 16);
       const theme = challengeTheme[row.kind];
+      const small = row.kind === "normal";
+      const h = small ? 37 : 62;
+      const narrow = timeline && w < 220;
       c.save();
       c.beginPath();
-      c.roundRect(x, y, w, 62, theme ? 1 : 5);
+      c.roundRect(x, y, w, h, theme ? 1 : 5);
       c.clip();
       c.fillStyle = theme?.color ?? "#e8e2d8";
-      c.fillRect(x, y, w, 62);
-      const banner = (row.banner && media.get(row.banner)) || (theme && local.get(theme.image));
-      const badge = (row.icon && media.get(row.icon)) || icon;
-      const padding = badge && w >= 115 ? 54 : 8;
-      const summary = label(row, data.now, w > 365);
-      const textWidth = Math.max(0, (banner ? w * 0.76 : w) - padding - 8);
+      c.fillRect(x, y, w, h);
+      const banner = portrait(row.character, "card") || (row.banner && media.get(row.banner)) || (theme && local.get(theme.image));
+      const face = portrait(row.character, "face");
+      const badge = face || (row.icon && media.get(row.icon)) || icon;
+      const padding = badge && w >= 115 ? small ? 37 : narrow ? 40 : 54 : 8;
+      const heading = narrow ? row.character ?? /^「([^」]+)」/u.exec(row.title)?.[1] ?? row.title : row.title;
+      const summary = narrow && data.now < row.start ? time(row.start) : label(row, data.now, w > 365);
+      const textWidth = Math.max(0, (banner && !narrow ? w * 0.76 : w) - padding - 8);
       if (banner && w >= 60) {
         const bw = Math.min(Math.round(w * 0.6), 500);
         const bx = x + w - bw;
-        cover(c, banner, bx, y, bw, 62);
+        cover(c, banner, bx, y, bw, h);
         c.font = font(16, family);
-        const titleWidth = c.measureText(row.title).width;
+        const titleWidth = c.measureText(heading).width;
         c.font = font(12, family);
         const labelWidth = c.measureText(summary).width;
         const opaque = Math.max(bx, x + padding + Math.min(textWidth, Math.max(titleWidth, labelWidth)) + 6);
@@ -224,17 +272,20 @@ export async function renderStarrailCalendar(data: CalendarData, mode: "calendar
         gradient.addColorStop(0, theme?.color ?? "#e8e2d8");
         gradient.addColorStop(1, "#0000");
         c.fillStyle = gradient;
-        c.fillRect(bx, y, bw, 62);
+        c.fillRect(bx, y, bw, h);
       }
-      if (badge && w >= 115) c.drawImage(badge, x + 9, y + 11, 38, 38);
+      if (badge && w >= 115) {
+        const edge = small ? 22 : narrow ? 30 : face ? 51 : 38;
+        c.drawImage(badge, x + (face ? 0 : 9), y + (h - edge) / 2, edge, edge);
+      }
       const color = theme ? "#d3bc8d" : "#25272b";
-      text(c, row.title, x + padding, y + 27, 16, color, family, "left", textWidth);
-      text(c, summary, x + padding, y + 46, 12, color, family, "left", textWidth);
+      text(c, heading, x + padding, y + (small ? 15 : 27), small ? 13 : 16, color, family, "left", textWidth);
+      text(c, summary, x + padding, y + (small ? 31 : 46), small ? 10 : 12, color, family, "left", textWidth);
       if (w > 16) {
         c.lineWidth = 1;
         c.strokeStyle = "#ffffff8e";
         c.beginPath();
-        c.roundRect(x + 2.5, y + 2.5, w - 5, 57, 4);
+        c.roundRect(x + 2.5, y + 2.5, w - 5, h - 5, 4);
         c.stroke();
       }
       c.restore();
@@ -244,8 +295,31 @@ export async function renderStarrailCalendar(data: CalendarData, mode: "calendar
     if (!data.detailsAvailable) foot += " · 公告详情暂不可用";
     c.fillStyle = "#0009";
     c.beginPath();
-    c.roundRect(width / 2 - 280, height - 48, 560, 34, 18);
+    c.roundRect(width / 2 - 280, footer - 48, 560, 34, 18);
     c.fill();
-    text(c, foot, width / 2, height - 25, 16, "#fff", family, "center");
+    text(c, foot, width / 2, footer - 25, 16, "#fff", family, "center");
+    if (talentCards.length) {
+      c.fillStyle = "#0009";
+      c.fillRect(10, footer, width - 20, height - footer - 8);
+      for (const [index, { role, title, item, color, groupSize }] of talentCards.entries()) {
+        const x = 16 + (index % talentsPerRow) * 87;
+        const y = footer + 6 + Math.floor(index / talentsPerRow) * 109;
+        const image = portrait(role.name, "face");
+        c.fillStyle = color;
+        c.fillRect(x + 2, y + 18, 84, 4);
+        c.fillStyle = role.star === 5 ? "#9c6b44" : "#645088";
+        c.fillRect(x + 5, y + 23, 77, 78);
+        if (image) cover(c, image, x + 5, y + 23, 77, 70);
+        text(c, role.short, x + 43, y + 99, 10, "#fff", family, "center", 69);
+        const weekly = role.weekly && localMaterial(role.weekly, "weekly");
+        if (weekly) c.drawImage(weekly, x + 59, y + 77, 23, 23);
+        if (title) {
+          const material = localMaterial(item, "talent");
+          if (material) c.drawImage(material, x, y - 2, 31, 31);
+          const labelX = x + (material ? 29 : 1);
+          text(c, title, labelX, y + 14, 12, "#fff", family, "left", Math.min(groupSize > 1 ? 120 : 78, width - labelX - 6));
+        }
+      }
+    }
   }, "gpu");
 }

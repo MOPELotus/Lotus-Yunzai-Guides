@@ -18,7 +18,9 @@
 
 从旧部署迁移时，可把已有的 `Genshin/TeamGuides/` 放到 `data/guides/Genshin/TeamGuides/`，首次下载完成前会读取这个目录。希望只使用指定目录时，启动前设置 `LOTUS_GUIDES_TEAM_DIR`。如只想暂停自动更新并保留主人更新指令，可设置 `LOTUS_GUIDES_AUTO_UPDATE=0`。
 
-## 星铁活动日历
+## 活动日历
+
+原神用 `#日历`、`喵喵日历`，列表用 `#日历列表` 或 `喵喵日历列表`。原神版读取公开游戏公告和活动公告，显示祈愿、集录、纪行和活动。已有旧喵喵资源时，也会显示角色生日和当天开放的天赋材料，按北京时间 04:00 切换。原神资源可由 `LOTUS_GENSHIN_GACHA_THEME_DIR` 指定，默认读取 `data/genshin/miao-theme/`。
 
 `*日历` 或 `#星铁日历` 查看北京时间今天前后各六天。用 `*日历列表` 或 `#星铁日历列表` 查看同一批活动的列表。数据取自国服公开公告，公告中的活动时间优先。挑战仅在公告提供确切时段时显示。
 
@@ -30,4 +32,4 @@
 - 角色别名保留原 Miao `resources/meta-gs/character/alias.js`，角色 ID 与名称取自同目录的 `data.json`。版本为 `2860761836069af80bacee5cb85b6dd2e91ea0b0`。保留 [MIT 许可](LICENSE-MIAO)。[Miao 源码](https://github.com/MOPELotus/miao-plugin/tree/2860761836069af80bacee5cb85b6dd2e91ea0b0)
 - 配队索引与原图通过运行时 Git 从 Mora 资源库的 `master` 分支读取。初次迁移对照提交为 `85231a2a1dc2ea0c1c67568a97ac3e144e734b72`。作者为茗血茶和卡玛sei亚。[配队图来源](https://www.miyoushe.com/ys/collection/1070358)、[阵容图来源](https://www.miyoushe.com/ys/collection/491538)、[Mora 资源库](https://gitee.com/Rrrrrrray/mora-plugin-res)
 - 角色攻略沿用 Rrrrrrray 的 Mora-Plugin 同一版本的 `apps/roleGuides.js`、`model/roleGuide.js` 与三个默认攻略配置，按原作者从 Mora 资源库和米游社合集读取图片。星铁角色别名及 ID/名称来自 Miao 同一提交里的 `resources/meta-sr/character/`。[Mora-Plugin](https://gitee.com/Rrrrrrray/mora-plugin)、[Mora 资源库](https://gitee.com/Rrrrrrray/mora-plugin-res)
-- 星铁活动日历依据同一 Miao 提交里的 `apps/wiki/Calendar.js`、`apps/wiki/CalendarSr.js` 和 `resources/wiki/calendar.html`、`calendar.css`。[喵喵日历源文件](https://github.com/MOPELotus/miao-plugin/tree/2860761836069af80bacee5cb85b6dd2e91ea0b0/apps/wiki)
+- 原神和星铁活动日历依据同一 Miao 提交里的 `apps/wiki/Calendar.js`、`apps/wiki/CalendarSr.js` 和 `resources/wiki/calendar.html`、`calendar.css`。原神材料轮换沿用 `resources/meta-gs/material/daily.js`。[喵喵日历源文件](https://github.com/MOPELotus/miao-plugin/tree/2860761836069af80bacee5cb85b6dd2e91ea0b0/apps/wiki)

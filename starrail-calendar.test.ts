@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { calendarContentUrl, calendarListUrl, buildStarrailCalendar, calendarTime, createStarrailCalendarSource } from "./starrail-calendar-data.ts";
-import { createStarrailCalendar } from "./starrail-calendar.ts";
+import { calendarContentUrl, calendarListUrl, buildStarrailCalendar, calendarTime, createStarrailCalendarSource } from "./calendar-data.ts";
+import { createStarrailCalendar } from "./calendar.ts";
 
 const now = Date.parse("2026-11-20T03:30:00+08:00");
 const raw = {

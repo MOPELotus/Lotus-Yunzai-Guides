@@ -1,16 +1,24 @@
 // Adapted from Miao-Plugin apps/wiki/Calendar.js and CalendarSr.js (MIT).
 export const calendarListUrl = "https://hkrpg-api.mihoyo.com/common/hkrpg_cn/announcement/api/getAnnList?game=hkrpg&game_biz=hkrpg_cn&lang=zh-cn&auth_appid=announcement&authkey_ver=1&bundle_id=hkrpg_cn&channel_id=1&level=65&platform=pc&region=prod_gf_cn&sdk_presentation_style=fullscreen&sdk_screen_transparent=true&sign_type=2&uid=100000000";
 export const calendarContentUrl = "https://hkrpg-api-static.mihoyo.com/common/hkrpg_cn/announcement/api/getAnnContent?game=hkrpg&game_biz=hkrpg_cn&lang=zh-cn&bundle_id=hkrpg_cn&platform=pc&region=prod_gf_cn&level=65&channel_id=1";
+const gsBase = "https://hk4e-api.mihoyo.com/common/hk4e_cn/announcement/api";
+const gsQuery = "game=hk4e&game_biz=hk4e_cn&lang=zh-cn&bundle_id=hk4e_cn&platform=pc&region=cn_gf01&level=55&uid=100000000";
+export const genshinCalendarListUrl = `${gsBase}/getAnnList?${gsQuery}`;
+export const genshinCalendarContentUrl = `${gsBase}/getAnnContent?${gsQuery}`;
 const day = 86_400_000;
 const china = 8 * 3_600_000;
 const ignore = /(更新概览|游戏优化|优化说明|内容专题页|专题展示页|版本更新说明|循星归程|调研|防沉迷|米游社|专项意见|更新修复与优化|问卷调查|有奖问卷|版本更新通知|更新时间说明|预下载功能|周边限时|周边上新|角色演示|角色PV|版本PV|动画短片|bilibili|激励计划|调整说明|攻略征集|测试招募)/u;
 const ignoreIds = new Set([257, 194, 203, 183, 187, 185, 171]);
+const gsIgnoreIds = new Set([495, 1263, 423, 422, 762]);
+const gsIgnore = /(内容专题页|版本更新说明|调研|防沉迷|米游社|专项意见|更新修复与优化|问卷调查|版本更新通知|更新时间说明|预下载功能|周边限时|周边上新|角色演示)/u;
 const dateText = "\\d{4}[/-]\\d{1,2}[/-]\\d{1,2}\\s+\\d{1,2}:\\d{2}(?::\\d{2})?";
 const datePattern = new RegExp(dateText, "gu");
 const activityHead = /(活动时间|活动跃迁时间|开启时间|上架时间|折扣时间|开放时间|限时活动期|领取时间)\s*[:：]?/gu;
 const challengeNames = ["混沌回忆", "虚构叙事", "末日幻影", "异相仲裁"] as const;
 
-export type CalendarKind = "character" | "weapon" | "pass" | "activity" | "abyss-1" | "abyss-2" | "abyss-3" | "abyss-4";
+export type CalendarGame = "genshin" | "starrail";
+export type CalendarKind = "character" | "weapon" | "chronicled" | "pass" | "normal" | "activity" | "abyss" | "newAbyss" |
+  "abyss-1" | "abyss-2" | "abyss-3" | "abyss-4";
 export interface CalendarRow {
   readonly title: string;
   readonly kind: CalendarKind;
@@ -20,6 +28,7 @@ export interface CalendarRow {
   readonly permanent?: boolean;
   readonly banner?: string;
   readonly icon?: string;
+  readonly character?: string;
 }
 export interface CalendarData {
   readonly rows: readonly CalendarRow[];
@@ -69,22 +78,41 @@ export function officialCalendarImage(value: unknown) {
 function publicData(value: unknown, keys: readonly string[]) {
   const response = record(value);
   const data = record(response.data);
-  if (response.retcode !== 0 || !keys.every((key) => Array.isArray(data[key]))) throw new Error("星铁公告响应格式变化。");
+  if (response.retcode !== 0 || !keys.every((key) => Array.isArray(data[key]))) throw new Error("游戏公告响应格式变化。");
   return data;
 }
 
-function versionStarts(details: readonly Record<string, unknown>[]) {
+function versionStarts(details: readonly Record<string, unknown>[], game: CalendarGame) {
   const starts = new Map<string, number>();
   for (const item of details) {
-    const version = /^(\d+\.\d+)版本.*更新(?:概览|说明|维护预告)/u.exec(string(item.title))?.[1];
+    const pattern = game === "genshin" ? /(\d+\.\d+|「[^」]+」)版本更新(?:通知|说明|维护预告)/u
+      : /^(\d+\.\d+)版本.*更新(?:概览|说明|维护预告)/u;
+    const version = pattern.exec(string(item.title))?.[1];
     if (!version) continue;
     const text = plain(item.content);
-    const update = /更新时间\s*[:：]?\s*([^■※]{1,140})/u.exec(text)?.[1];
+    const update = /更新时间\s*[〓:：]?\s*([^〓■※]{1,140})/u.exec(text)?.[1];
     const start = update && calendarTime(update.match(datePattern)?.[0]);
     const hours = update && /预计\s*(\d{1,2})\s*个?小时/u.exec(update)?.[1];
     if (typeof start === "number" && hours) starts.set(version, start + Number(hours) * 3_600_000);
   }
   return starts;
+}
+
+function genshinInterval(text: string, versions: ReadonlyMap<string, number>, listedEnd: number | undefined) {
+  const headings = /〓(?:活动时间|祈愿介绍|任务开放时间|折扣时间|挑战时间)〓\s*([^〓]+)/gu;
+  const explicit = new RegExp(`(${dateText})\\s*[-~～至]\\s*(${dateText})`, "u");
+  const afterVersion = new RegExp(`(\\d+\\.\\d+|「[^」]+」)版本更新(?:完成)?后\\s*[-~～至]\\s*(${dateText})`, "u");
+  for (const [, section] of text.matchAll(headings)) {
+    if (!section) continue;
+    const interval = explicit.exec(section);
+    const version = afterVersion.exec(section);
+    const persistent = /(\d+\.\d+|「[^」]+」)版本更新(?:完成)?后\s*永久开放/u.exec(section);
+    const throughout = /(\d+\.\d+|「[^」]+」)版本期间持续开放/u.exec(section);
+    const start = interval ? calendarTime(interval[1]) : versions.get(version?.[1] ?? persistent?.[1] ?? throughout?.[1] ?? "");
+    const end = interval ? calendarTime(interval[2]) : version ? calendarTime(version[2]) :
+      persistent ? calendarTime("2099/01/01 00:00:00") : throughout ? listedEnd : undefined;
+    if (start !== undefined && end !== undefined && end > start) return { start, end, permanent: !!persistent };
+  }
 }
 
 function detailInterval(text: string, versions: ReadonlyMap<string, number>) {
@@ -127,53 +155,71 @@ function kindFor(title: string): CalendarKind {
   return "activity";
 }
 
-function snapshot(list: unknown, detail: unknown, updated: number) {
-  const source = publicData(list, ["list", "pic_list"]);
-  if (source.timezone !== undefined && source.timezone !== 8) throw new Error("星铁公告时区变化。");
-  const notices = [
-    ...records(source.list).flatMap((entry) => records(entry.list)),
+function genshinKind(title: string, activity: boolean): CalendarKind {
+  if (/^(?:[「『])?幻想真境剧诗/u.test(title)) return "newAbyss";
+  if (/^(?:[「『])?深境螺旋/u.test(title)) return "abyss";
+  if (/集录祈愿/u.test(title)) return "chronicled";
+  if (/祈愿/u.test(title) && /概率UP/u.test(title)) return /单手剑|双手剑|长柄武器|弓·|法器·/u.test(title) ? "weapon" : "character";
+  if (/纪行/u.test(title)) return "pass";
+  return activity ? "activity" : "normal";
+}
+
+function snapshot(list: unknown, detail: unknown, updated: number, game: CalendarGame) {
+  const gs = game === "genshin";
+  const source = publicData(list, gs ? ["list"] : ["list", "pic_list"]);
+  if (source.timezone !== undefined && source.timezone !== 8) throw new Error("游戏公告时区变化。");
+  const sections = records(source.list);
+  const gsSections = sections.filter(({ type_label }) => type_label === "游戏公告" || type_label === "活动公告");
+  const notices = gs ? (gsSections.length ? gsSections : sections.slice(0, 2))
+    .flatMap((entry, index) => records(entry.list).map((item) => ({
+      item, activity: gsSections.length ? entry.type_label === "活动公告" : index === 1,
+    }))) : [
+    ...sections.flatMap((entry) => records(entry.list)),
     ...records(source.pic_list).flatMap((entry) => records(entry.type_list).flatMap((group) => records(group.list))),
-  ];
-  if (!notices.some((notice) => typeof notice.ann_id === "number" && typeof notice.start_time === "string")) {
-    throw new Error("星铁公告列表没有可识别的活动。");
+  ].map((item) => ({ item, activity: true }));
+  if (!notices.some(({ item }) => typeof item.ann_id === "number" && typeof item.start_time === "string")) {
+    throw new Error("游戏公告列表没有可识别的活动。");
   }
   let details: Record<string, unknown>[] = [];
   let detailsAvailable = false;
   try {
-    const content = publicData(detail, ["list", "pic_list"]);
+    const content = publicData(detail, gs ? ["list"] : ["list", "pic_list"]);
     details = [...records(content.list), ...records(content.pic_list)];
     detailsAvailable = details.length > 0;
   } catch {}
-  const versions = versionStarts(details);
+  const versions = versionStarts(details, game);
   const byKey = new Map(details.map((item) => [JSON.stringify([item.ann_id, plain(item.title)]), item]));
   const rows = new Map<string, CalendarRow>();
-  for (const item of notices) {
+  for (const { item, activity } of notices) {
     const id = item.ann_id;
-    const title = plain(item.title);
-    if (typeof id !== "number" || !title || ignoreIds.has(id) || ignore.test(title)) continue;
+    let title = plain(item.title);
+    if (typeof id !== "number" || !title || (gs ? gsIgnoreIds : ignoreIds).has(id) || (gs ? gsIgnore : ignore).test(title)) continue;
     const key = JSON.stringify([id, title]);
     if (rows.has(key)) continue;
     const notice = byKey.get(key);
-    const kind = kindFor(title);
+    const kind = gs ? genshinKind(title, activity) : kindFor(title);
     const text = plain(notice?.content);
     const listedEnd = calendarTime(item.end_time);
-    const advertised = detailInterval(text, versions);
-    if (kind.startsWith("abyss-") && !advertised) continue;
-    const warp = kind === "character" || kind === "weapon" ? warpInterval(text, listedEnd, versions) : undefined;
+    const advertised = gs ? genshinInterval(text, versions, listedEnd) : detailInterval(text, versions);
+    if ((kind.startsWith("abyss") || kind === "newAbyss") && !advertised) continue;
+    const warp = !gs && (kind === "character" || kind === "weapon") ? warpInterval(text, listedEnd, versions) : undefined;
     const start = advertised?.start ?? warp?.start ?? calendarTime(item.start_time);
     const end = advertised?.end ?? warp?.end ?? listedEnd;
     if (start === undefined || end === undefined || end <= start) continue;
+    const character = gs && kind === "character" ? /·([^·(（」]+)[(（]/u.exec(title)?.[1] : undefined;
+    if (gs && kind === "weapon") title = title.replace(/(?:单手剑|双手剑|长柄武器|弓|法器)·/gu, "");
     rows.set(key, {
       title, kind, start, end, permanent: advertised?.permanent, earliestEnd: advertised ? undefined : warp?.earliestEnd,
-      banner: officialCalendarImage(item.banner) ?? officialCalendarImage(item.img) ?? officialCalendarImage(notice?.img),
-      icon: officialCalendarImage(item.tag_icon),
+      banner: !gs || activity ? officialCalendarImage(item.banner) ?? officialCalendarImage(item.img) ?? officialCalendarImage(notice?.img) : undefined,
+      icon: officialCalendarImage(item.tag_icon), character,
     });
   }
   return { rows: [...rows.values()], updated, detailsAvailable };
 }
 
 const order: Record<CalendarKind, number> = {
-  "abyss-1": 0, "abyss-2": 0, "abyss-3": 0, "abyss-4": 0, character: 1, weapon: 2, pass: 5, activity: 5,
+  abyss: 0, newAbyss: 0, "abyss-1": 0, "abyss-2": 0, "abyss-3": 0, "abyss-4": 0,
+  character: 1, chronicled: 2, weapon: 3, pass: 5, activity: 5, normal: 10,
 };
 
 export function calendarWindow(data: ReturnType<typeof snapshot>, now: number, stale = false): CalendarData {
@@ -185,11 +231,15 @@ export function calendarWindow(data: ReturnType<typeof snapshot>, now: number, s
 }
 
 export function buildStarrailCalendar(list: unknown, content: unknown, now: number): CalendarData {
-  return calendarWindow(snapshot(list, content, now), now);
+  return calendarWindow(snapshot(list, content, now, "starrail"), now);
+}
+
+export function buildGenshinCalendar(list: unknown, content: unknown, now: number): CalendarData {
+  return calendarWindow(snapshot(list, content, now, "genshin"), now);
 }
 
 async function readJson(response: Response) {
-  if (!response.ok || !response.body) throw new Error("无法访问星铁官方公告。");
+  if (!response.ok || !response.body) throw new Error("无法访问游戏官方公告。");
   const reader = response.body.getReader();
   let size = 0;
   const chunks: Uint8Array[] = [];
@@ -198,7 +248,7 @@ async function readJson(response: Response) {
       const chunk = await reader.read();
       if (chunk.done) break;
       size += chunk.value.length;
-      if (size > 4 * 1024 * 1024) throw new Error("星铁公告响应超限。");
+      if (size > 4 * 1024 * 1024) throw new Error("游戏公告响应超限。");
       chunks.push(chunk.value);
     }
     return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
@@ -208,12 +258,13 @@ async function readJson(response: Response) {
   }
 }
 
-export function createStarrailCalendarSource(options: {
+export function createCalendarSource(game: CalendarGame, options: {
   readonly fetch?: typeof fetch;
   readonly signal?: AbortSignal;
   readonly now?: () => number;
 } = {}) {
   const transport = options.fetch ?? fetch;
+  const [listUrl, contentUrl] = game === "genshin" ? [genshinCalendarListUrl, genshinCalendarContentUrl] : [calendarListUrl, calendarContentUrl];
   const now = options.now ?? Date.now;
   let retained: ReturnType<typeof snapshot> | undefined;
   let active: Promise<ReturnType<typeof snapshot>> | undefined;
@@ -227,8 +278,8 @@ export function createStarrailCalendarSource(options: {
     if (retained && time - retained.updated < (retained.detailsAvailable ? 600_000 : 60_000)) {
       return calendarWindow(retained, time);
     }
-    active ??= Promise.all([request(calendarListUrl), request(calendarContentUrl).catch(() => undefined)])
-      .then(([list, detail]) => retained = snapshot(list, detail, now())).finally(() => { active = undefined; });
+    active ??= Promise.all([request(listUrl), request(contentUrl).catch(() => undefined)])
+      .then(([list, detail]) => retained = snapshot(list, detail, now(), game)).finally(() => { active = undefined; });
     try {
       return calendarWindow(await active, now());
     } catch (error) {
@@ -237,3 +288,6 @@ export function createStarrailCalendarSource(options: {
     }
   };
 }
+
+export const createStarrailCalendarSource = (options?: Parameters<typeof createCalendarSource>[1]) => createCalendarSource("starrail", options);
+export const createGenshinCalendarSource = (options?: Parameters<typeof createCalendarSource>[1]) => createCalendarSource("genshin", options);

@@ -5,7 +5,7 @@ import { teamGuides } from "./team-guides.ts";
 import { createTeamResources } from "./team-resources.ts";
 import { createRoleGuides } from "./role-guides.ts";
 import { createRoleReferences } from "./role-references.ts";
-import { createStarrailCalendar } from "./starrail-calendar.ts";
+import { createGenshinCalendar, createStarrailCalendar } from "./calendar.ts";
 
 type TeamResources = ReturnType<typeof createTeamResources>;
 
@@ -16,6 +16,7 @@ export function createGuidesModule(options: {
   readonly roleGuides?: ReturnType<typeof createRoleGuides>;
   readonly roleReferences?: ReturnType<typeof createRoleReferences>;
   readonly starrailCalendar?: ReturnType<typeof createStarrailCalendar>;
+  readonly genshinCalendar?: ReturnType<typeof createGenshinCalendar>;
 }): CommandModule {
   const { resources } = options;
   const refresh = (force: boolean) => async (argument: string, { isMaster }: { isMaster: boolean }) => {
@@ -37,7 +38,7 @@ export function createGuidesModule(options: {
     },
     async fallback(message, { normalizedMessage }) {
       const command = normalizedMessage || message;
-      const calendar = options.starrailCalendar?.(command);
+      const calendar = options.genshinCalendar?.(command) ?? options.starrailCalendar?.(command);
       if (calendar !== undefined) return calendar;
       const roleGuide = options.roleReferences?.(command) ?? options.roleGuides?.(command);
       if (roleGuide !== undefined) return roleGuide;
@@ -101,10 +102,11 @@ export function createModule({ signal }: { signal: AbortSignal }) {
   const roleGuides = createRoleGuides(guideOptions);
   const roleReferences = createRoleReferences(guideOptions);
   const starrailCalendar = createStarrailCalendar({ signal: refreshSignal });
+  const genshinCalendar = createGenshinCalendar({ signal: refreshSignal });
   const resources = directory ? undefined : createTeamResources({ root, fallback: legacyDirectory, signal: refreshSignal });
   const stop = !resources || Bun.env.LOTUS_GUIDES_AUTO_UPDATE === "0" ? undefined : startTeamResourceRefresh(resources, refreshSignal);
   return {
-    ...createGuidesModule({ directory: directory ?? legacyDirectory, forward, resources, roleGuides, roleReferences, starrailCalendar }),
+    ...createGuidesModule({ directory: directory ?? legacyDirectory, forward, resources, roleGuides, roleReferences, starrailCalendar, genshinCalendar }),
     async dispose() {
       controller.abort();
       if (stop) await stop();
