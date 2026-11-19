@@ -1,0 +1,9 @@
+{
+  "name": "@lotus-yunzai/guides",
+  "private": true,
+  "type": "module",
+  "lotusYunzai": {
+    "entry": "./index.ts",
+    "games": ["genshin"]
+  }
+}
