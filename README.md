@@ -24,6 +24,8 @@
 
 `*日历` 或 `#星铁日历` 查看北京时间今天前后各六天。用 `*日历列表` 或 `#星铁日历列表` 查看同一批活动的列表。数据取自国服公开公告，公告中的活动时间优先。挑战仅在公告提供确切时段时显示。
 
+绝区零用 `%日历`、`#绝区零日历`，列表用 `%日历列表`、`#绝区零日历列表`。限时频段和活动图取自原国服公告。绝区零采用旧喵喵日历实际使用的水元素底图，默认沿用 `data/genshin/miao-theme/` 的原公用资源，也可单独设置 `LOTUS_ZZZ_CALENDAR_THEME_DIR`。
+
 日历沿用喵喵版式。已有旧喵喵资源时，可以用 `LOTUS_STAR_RAIL_GACHA_THEME_DIR` 指向其 `resources/`，或放在 `data/starrail/miao-theme/`。活动图读取公告原地址，渲染用本机物理 GPU。
 
 ## 来源
@@ -32,4 +34,4 @@
 - 角色别名保留原 Miao `resources/meta-gs/character/alias.js`，角色 ID 与名称取自同目录的 `data.json`。版本为 `2860761836069af80bacee5cb85b6dd2e91ea0b0`。保留 [MIT 许可](LICENSE-MIAO)。[Miao 源码](https://github.com/MOPELotus/miao-plugin/tree/2860761836069af80bacee5cb85b6dd2e91ea0b0)
 - 配队索引与原图通过运行时 Git 从 Mora 资源库的 `master` 分支读取。初次迁移对照提交为 `85231a2a1dc2ea0c1c67568a97ac3e144e734b72`。作者为茗血茶和卡玛sei亚。[配队图来源](https://www.miyoushe.com/ys/collection/1070358)、[阵容图来源](https://www.miyoushe.com/ys/collection/491538)、[Mora 资源库](https://gitee.com/Rrrrrrray/mora-plugin-res)
 - 角色攻略沿用 Rrrrrrray 的 Mora-Plugin 同一版本的 `apps/roleGuides.js`、`model/roleGuide.js` 与三个默认攻略配置，按原作者从 Mora 资源库和米游社合集读取图片。星铁角色别名及 ID/名称来自 Miao 同一提交里的 `resources/meta-sr/character/`。[Mora-Plugin](https://gitee.com/Rrrrrrray/mora-plugin)、[Mora 资源库](https://gitee.com/Rrrrrrray/mora-plugin-res)
-- 原神和星铁活动日历依据同一 Miao 提交里的 `apps/wiki/Calendar.js`、`apps/wiki/CalendarSr.js` 和 `resources/wiki/calendar.html`、`calendar.css`。原神材料轮换沿用 `resources/meta-gs/material/daily.js`。[喵喵日历源文件](https://github.com/MOPELotus/miao-plugin/tree/2860761836069af80bacee5cb85b6dd2e91ea0b0/apps/wiki)
+- 三款游戏的活动日历依据同一 Miao 提交里的 `apps/wiki/Calendar.js`、`CalendarSr.js`、`CalendarZZZ.js` 及 `resources/wiki/calendar.html`、`calendar.css`。原神材料轮换沿用 `resources/meta-gs/material/daily.js`。[喵喵日历源文件](https://github.com/MOPELotus/miao-plugin/tree/2860761836069af80bacee5cb85b6dd2e91ea0b0/apps/wiki)

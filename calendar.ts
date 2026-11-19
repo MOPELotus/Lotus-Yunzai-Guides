@@ -5,6 +5,7 @@ import { createCalendarSource, type CalendarGame } from "./calendar-data.ts";
 const games = {
   starrail: { label: "星铁", rule: /^#星铁日历(列表)?$/u, theme: "LOTUS_STAR_RAIL_GACHA_THEME_DIR" },
   genshin: { label: "原神", rule: /^(?:#|喵喵)+日历(列表)?$/u, theme: "LOTUS_GENSHIN_GACHA_THEME_DIR" },
+  zzz: { label: "绝区零", rule: /^#绝区零日历(列表)?$/u, theme: "LOTUS_ZZZ_CALENDAR_THEME_DIR" },
 } as const;
 
 function createGameCalendar(game: CalendarGame, options: {
@@ -14,7 +15,7 @@ function createGameCalendar(game: CalendarGame, options: {
   readonly themeDirectory?: string;
 } = {}) {
   const config = games[game];
-  const defaultTheme = fileURLToPath(new URL(`../../data/${game}/miao-theme/`, import.meta.url));
+  const defaultTheme = fileURLToPath(new URL(`../../data/${game === "zzz" ? "genshin" : game}/miao-theme/`, import.meta.url));
   const source = createCalendarSource(game, options);
   return (message: string): CommandReply | Promise<CommandReply> | undefined => {
     const match = config.rule.exec(message.trim());
@@ -38,3 +39,4 @@ function createGameCalendar(game: CalendarGame, options: {
 
 export const createStarrailCalendar = (options?: Parameters<typeof createGameCalendar>[1]) => createGameCalendar("starrail", options);
 export const createGenshinCalendar = (options?: Parameters<typeof createGameCalendar>[1]) => createGameCalendar("genshin", options);
+export const createZzzCalendar = (options?: Parameters<typeof createGameCalendar>[1]) => createGameCalendar("zzz", options);

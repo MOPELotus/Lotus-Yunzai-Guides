@@ -35,11 +35,15 @@ function relative(milliseconds: number) {
 
 function label(row: CalendarRow, now: number, showStart: boolean) {
   if (row.permanent) return row.start <= now ? `${time(row.start)} 后永久有效` : "永久开放";
+  if (row.startUnverified) return `截止：${time(row.end)}`;
   if (row.end - row.start > 365 * day) return "结束时间以活动公告为准";
   if (row.earliestEnd !== undefined) return `分批结束：${time(row.earliestEnd)} 至 ${time(row.end)}`;
-  if (row.start > now) return `${time(row.start)}（${relative(row.start - now)}后开始）`;
-  if (row.end > now) return `${showStart ? time(row.start) + " ~ " : ""}${time(row.end)}（${relative(row.end - now)}后结束）`;
-  return `${time(row.start)} ~ ${time(row.end)}`;
+  const crossesYear = new Date(row.start + china).getUTCFullYear() !== new Date(row.end + china).getUTCFullYear();
+  const start = time(row.start, crossesYear);
+  const end = time(row.end, crossesYear);
+  if (row.start > now) return `${start}（${relative(row.start - now)}后开始）`;
+  if (row.end > now) return `${showStart ? start + " ~ " : ""}${end}（${relative(row.end - now)}后结束）`;
+  return `${start} ~ ${end}`;
 }
 
 async function themeImage(root: string | undefined, path: string) {
@@ -125,6 +129,7 @@ export async function renderCalendar(data: CalendarData, mode: "calendar" | "lis
   const width = timeline ? 996 : 740;
   const panel = width - 40;
   const gs = options.game === "genshin";
+  const hydro = options.game !== "starrail";
   const rows = packedRows(data.rows, timeline, gs);
   const source = options.themeDirectory && await realpath(options.themeDirectory).catch(() => undefined);
   const extras = gs && source ? await genshinCalendarExtras(source, data.start, data.now) : undefined;
@@ -169,7 +174,7 @@ export async function renderCalendar(data: CalendarData, mode: "calendar" | "lis
     ]),
   ].filter((item): item is string => !!item);
   const [background, icon, challenges, remote, genshin] = await Promise.all([
-    themeImage(source, gs ? "common/bg/bg-hydro.webp" : "common/bg/bg-sr.webp"), themeImage(source, "wiki/imgs/calendar-icon.png"),
+    themeImage(source, hydro ? "common/bg/bg-hydro.webp" : "common/bg/bg-sr.webp"), themeImage(source, "wiki/imgs/calendar-icon.png"),
     Promise.all(Object.values(challengeTheme).map(async ({ image }) => [image, await themeImage(source, "wiki/imgs/" + image)] as const)),
     Promise.all(urls.map(async (url) => [url, await webImage(url, transport, options.signal)] as const)),
     Promise.all([...new Set(characterFiles)].map(async (path) => [path, await themeImage(source, path)] as const)),
@@ -181,7 +186,7 @@ export async function renderCalendar(data: CalendarData, mode: "calendar" | "lis
   const localMaterial = (name: string, type: "talent" | "weekly") => things.get(genshinCalendarMaterial(name, type) ?? "");
   return renderPng(Math.ceil(width * scale), Math.ceil(height * scale), (c) => {
     c.scale(scale, scale);
-    c.fillStyle = gs ? "#16243c" : "#181a31";
+    c.fillStyle = hydro ? "#16243c" : "#181a31";
     c.fillRect(0, 0, width, height);
     if (background) c.drawImage(background, 0, 0, width, height);
     c.fillStyle = "#0009";
@@ -257,7 +262,7 @@ export async function renderCalendar(data: CalendarData, mode: "calendar" | "lis
       const badge = face || (row.icon && media.get(row.icon)) || icon;
       const padding = badge && w >= 115 ? small ? 37 : narrow ? 40 : 54 : 8;
       const heading = narrow ? row.character ?? /^「([^」]+)」/u.exec(row.title)?.[1] ?? row.title : row.title;
-      const summary = narrow && data.now < row.start ? time(row.start) : label(row, data.now, w > 365);
+      const summary = narrow && !row.startUnverified && data.now < row.start ? time(row.start) : label(row, data.now, w > 365);
       const textWidth = Math.max(0, (banner && !narrow ? w * 0.76 : w) - padding - 8);
       if (banner && w >= 60) {
         const bw = Math.min(Math.round(w * 0.6), 500);

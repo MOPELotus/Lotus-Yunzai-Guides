@@ -4,7 +4,7 @@
   "type": "module",
   "lotusYunzai": {
     "entry": "./index.ts",
-    "games": ["genshin", "starrail"]
+    "games": ["genshin", "starrail", "zzz"]
   },
   "dependencies": {
     "@lotus-yunzai/skia": "workspace:*",
