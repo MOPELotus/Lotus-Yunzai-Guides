@@ -49,6 +49,13 @@ function teamIndex(yaml: string): TeamIndex {
   };
 }
 
+export const teamGuideAuthors = ["茗血茶", "卡玛sei亚"] as const;
+
+export function indexedTeamImages(yaml: string): string[] {
+  const index = teamIndex(yaml);
+  return teamGuideAuthors.flatMap((author) => Object.keys(index[author]).map((name) => `${author}/${name}.png`));
+}
+
 function searchTeams(teams: TeamIndex, query: string) {
   if (query.endsWith("队")) query = query.replace("队", "");
   if (!query) return { images: [] };
@@ -129,4 +136,4 @@ export async function teamGuides(directory: string, query: string, forward: bool
   return forward ? { type: "forward", nodes: [title, ...images] } : [title, ...images];
 }
 
-const pngHeader = Buffer.from("89504e470d0a1a0a", "hex");
+export const pngHeader = Buffer.from("89504e470d0a1a0a", "hex");

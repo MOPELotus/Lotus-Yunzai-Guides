@@ -5,5 +5,8 @@
   "lotusYunzai": {
     "entry": "./index.ts",
     "games": ["genshin"]
+  },
+  "dependencies": {
+    "node-schedule": "2.1.2"
   }
 }
