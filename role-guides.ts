@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import type { CommandReply } from "../../lib/commands.ts";
 import { createRoleGuideCollections } from "./role-guide-collections.ts";
-import { createRoleResourcePack } from "./role-resource-pack.ts";
+import { createRoleResourcePack, type RolePackFallback } from "./role-resource-pack.ts";
 import { guideGames, parseGuideCommand, resolveGuideRole, safeGuideName, type GuideGame } from "./role-guide-input.ts";
 import { findGuidePack, readGuideImage, writeGuideFile, type GuideImage } from "./role-image-files.ts";
 
@@ -11,7 +11,7 @@ export function createRoleGuides(options: {
   readonly legacyStrategies?: readonly string[];
   readonly atlas?: string;
   readonly config?: string;
-  readonly guidePack?: string;
+  readonly guidePack?: RolePackFallback;
   readonly signal?: AbortSignal;
   readonly forward?: boolean;
   readonly fetch?: typeof fetch;

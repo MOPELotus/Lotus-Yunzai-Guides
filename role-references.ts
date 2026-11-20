@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import type { CommandReply } from "../../lib/commands.ts";
 import type { MessageReply } from "../../lib/messages.ts";
-import { createRoleResourcePack, referenceNotes } from "./role-resource-pack.ts";
+import { createRoleResourcePack, referenceNotes, type RolePackFallback } from "./role-resource-pack.ts";
 import { resolveGuideRole, safeGuideName, type GuideGame } from "./role-guide-input.ts";
 
 const genshinHelp = [
@@ -30,7 +30,7 @@ function readNotes(bytes: Buffer | undefined, name: string) {
 
 export function createRoleReferences(options: {
   readonly cache: string;
-  readonly guidePack?: string;
+  readonly guidePack?: RolePackFallback;
   readonly signal?: AbortSignal;
   readonly forward?: boolean;
   readonly guideSource?: string;

@@ -9,8 +9,14 @@ const revision = /^[0-9a-f]{40}$/u;
 type Blob = { readonly source: string; readonly hash: string };
 type RolePack = { readonly checkedAt: number; readonly files: readonly Blob[]; readonly images: readonly GuideImage[] };
 const refreshAfter = 24 * 60 * 60 * 1000;
+const retryAfter = 120_000;
 export const referenceNotes = "RefStat:RefNotes.yaml";
+export type RolePackFallback = string | readonly string[];
 const notesLimit = 128 * 1024;
+
+function hasImage(files: readonly GuideImage[]): boolean {
+  return files.some(({ source }) => source !== referenceNotes);
+}
 
 function validFile(source: string, bytes: Buffer): boolean {
   if (source !== referenceNotes) return isGuideImage(bytes);
@@ -64,17 +70,27 @@ async function readReferenceFallback(root: string, game: GuideGame, name: string
 
 export function createRoleResourcePack(options: {
   readonly root: string;
-  readonly fallback?: string;
+  readonly fallback?: RolePackFallback;
   readonly upstream?: string;
   readonly signal?: AbortSignal;
   readonly references?: boolean;
 }) {
   const pending = new Map<string, Promise<readonly GuideImage[]>>();
-  async function read(game: GuideGame, name: string, force: boolean): Promise<readonly GuideImage[]> {
+  const recentAttempts = new Map<string, number>();
+  const fallbacks = typeof options.fallback === "string" ? [options.fallback] : options.fallback ?? [];
+
+  async function localFiles(game: GuideGame, name: string) {
+    for (const root of fallbacks) {
+      const local = join(root, guideGames[game].pack, "Roles");
+      const files = options.references ? await readReferenceFallback(local, game, name) : await findGuidePack(join(local, "Guides"), name);
+      if (hasImage(files)) return files;
+    }
+    return [];
+  }
+
+  async function read(game: GuideGame, name: string, force: boolean, retained: RolePack | undefined): Promise<readonly GuideImage[]> {
     const gamePath = guideGames[game].pack;
     const directory = join(options.root, gamePath, name);
-    const existing = await readPack(directory);
-    if (!force && existing && Date.now() - existing.checkedAt < refreshAfter) return existing.images;
     const timeout = AbortSignal.timeout(75_000);
     const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
     try {
@@ -83,7 +99,8 @@ export function createRoleResourcePack(options: {
       const lock = await lockFile(join(directory, "refresh.lock"), "角色攻略");
       let temporary: string | undefined;
       try {
-        const current = await readPack(directory);
+        const current = await readPack(directory) ?? retained;
+        retained = current;
         if (!force && current && Date.now() - current.checkedAt < refreshAfter) return current.images;
         temporary = await mkdtemp(join(directory, ".refresh-"));
         const git = await prepareGuideSourceGit(temporary, options.upstream ?? guideSource, signal);
@@ -116,6 +133,7 @@ export function createRoleResourcePack(options: {
             if (!Number.isSafeInteger(size) || size < 1 || size > limit) throw new Error("角色攻略资源大小无效。");
             bytes = await git(["cat-file", "blob", hash], undefined, limit);
             if (bytes.byteLength !== size || !validFile(source, bytes)) throw new Error("角色攻略资源不完整。");
+            signal.throwIfAborted();
             await writeGuideFile(join(directory, hash), bytes);
           }
           total += bytes.byteLength;
@@ -138,20 +156,34 @@ export function createRoleResourcePack(options: {
       if (!signal.aborted && error instanceof Error && error.message.startsWith("无法读取上游攻略资源")) {
         console.warn("[guides] 角色攻略资源无法刷新，保留已有原图。", error.message);
       }
-      if (existing?.images.length) return existing.images;
-      if (!options.fallback) return [];
-      const local = join(options.fallback, gamePath, "Roles");
-      return options.references ? readReferenceFallback(local, game, name) : findGuidePack(join(local, "Guides"), name);
+      return retained && hasImage(retained.images) ? retained.images : localFiles(game, name);
     }
   }
 
-  return (game: GuideGame, name: string, force: boolean) => {
-    const key = `${game}/${name}`;
-    if (!safeGuideName(name)) return Promise.resolve([]);
+  function refresh(key: string, game: GuideGame, name: string, force: boolean, existing: RolePack | undefined) {
     const running = pending.get(key);
     if (running) return running;
-    const operation = read(game, name, force).finally(() => pending.delete(key));
+    recentAttempts.delete(key);
+    recentAttempts.set(key, Date.now());
+    if (recentAttempts.size > 256) recentAttempts.delete(recentAttempts.keys().next().value!);
+    const operation = read(game, name, force, existing).finally(() => pending.delete(key));
     pending.set(key, operation);
     return operation;
+  }
+
+  return async (game: GuideGame, name: string, force: boolean): Promise<readonly GuideImage[]> => {
+    if (!safeGuideName(name)) return [];
+    const key = `${game}/${name}`;
+    const existing = await readPack(join(options.root, guideGames[game].pack, name));
+    if (force) return refresh(key, game, name, true, existing);
+    if (existing && Date.now() - existing.checkedAt < refreshAfter) return existing.images;
+
+    const cached = existing && hasImage(existing.images) ? existing.images : await localFiles(game, name);
+    if (!cached.length) return refresh(key, game, name, false, existing);
+    if (!options.signal?.aborted && Date.now() - (recentAttempts.get(key) ?? 0) >= retryAfter) {
+      // Keep a verified local image usable while the original source refreshes.
+      void refresh(key, game, name, false, existing).catch(() => {});
+    }
+    return cached;
   };
 }

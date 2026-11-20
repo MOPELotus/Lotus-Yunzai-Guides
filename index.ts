@@ -107,7 +107,8 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
     cache: Bun.env.LOTUS_GUIDES_ROLE_DIR?.trim() || data("../../data/guides/roleGuides/"),
     config: Bun.env.LOTUS_GUIDES_ROLE_CONFIG_DIR?.trim() || data("../../config/guides/"),
     atlas: Bun.env.LOTUS_GUIDES_LEGACY_ATLAS_DIR?.trim() || data("../../data/guides/legacy-atlas/"),
-    guidePack: Bun.env.LOTUS_GUIDES_MORA_PACK_DIR?.trim() || data("../../data/guides/mora-plugin-res/"),
+    guidePack: Bun.env.LOTUS_GUIDES_MORA_PACK_DIR?.trim() || [data("../../data/guides/mora-plugin-res/"),
+      data("../mora-plugin/resources/mora-plugin-res/")],
     legacyStrategies: [data("../../temp/strategy/"), data("../../data/strategy/")],
     signal: refreshSignal, forward,
   };

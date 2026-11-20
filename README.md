@@ -4,9 +4,9 @@
 
 `#钟离攻略`、`*流萤攻略` 和 `%艾莲一图流` 分别查询原神、星铁和绝区零的角色攻略。也可以用角色别名或 `#星铁`、`#绝区零` 前缀。用 `#更新钟离攻略`、`*更新流萤攻略` 或 `%更新艾莲一图流` 重新检查原资源仓和作者合集，无需等合集列表的两分钟缓存过期。更新失败时会尝试使用本机已有原图。
 
-首次查询按角色读取旧 Mora 资源仓，之后按需隔一天检查一次。米游社攻略沿用 Mora 的作者合集。缓存和自定义图默认放在 `data/guides/roleGuides/`，可用 `LOTUS_GUIDES_ROLE_DIR` 改路径。自定义图放在 `add_ons/<作者>/<角色>.<扩展名>`，星铁和绝区零在作者目录下分别多一层 `StarRail/` 和 `ZenlessZoneZero/`。同一作者的自定义图优先。
+缺少本地原图时，首次查询按角色读取旧 Mora 资源仓。已有原图的普通查询先使用本地版本，缓存到期后在后台检查，只下载有变化的原图。米游社攻略沿用 Mora 的作者合集。缓存和自定义图默认放在 `data/guides/roleGuides/`，可用 `LOTUS_GUIDES_ROLE_DIR` 改路径。自定义图放在 `add_ons/<作者>/<角色>.<扩展名>`，星铁和绝区零在作者目录下分别多一层 `StarRail/` 和 `ZenlessZoneZero/`。同一作者的自定义图优先。
 
-要沿用原有合集配置，将 `roleGuides.yaml`、`srRoleGuides.yaml` 和 `zzzRoleGuides.yaml` 放进 `config/guides/`。也可用 `LOTUS_GUIDES_ROLE_CONFIG_DIR` 指定旧插件的配置目录。旧 `temp/strategy/` 与 `data/strategy/` 中的原神图可以继续读。旧 Atlas 目录可用 `LOTUS_GUIDES_LEGACY_ATLAS_DIR` 指定，已有 Mora 资源包可用 `LOTUS_GUIDES_MORA_PACK_DIR` 指定，供原站访问失败时读取。
+要沿用原有合集配置，将 `roleGuides.yaml`、`srRoleGuides.yaml` 和 `zzzRoleGuides.yaml` 放进 `config/guides/`。也可用 `LOTUS_GUIDES_ROLE_CONFIG_DIR` 指定旧插件的配置目录。旧 `temp/strategy/` 与 `data/strategy/` 中的原神图可以继续读。旧 Atlas 目录可用 `LOTUS_GUIDES_LEGACY_ATLAS_DIR` 指定。原资源包默认依次从 `data/guides/mora-plugin-res/` 和旧部署的 `plugins/mora-plugin/resources/mora-plugin-res/` 读取，可用 `LOTUS_GUIDES_MORA_PACK_DIR` 指定自己的副本。
 
 `#钟离进阶参考`、`#钟离收益曲线` 和 `*罗刹参考面板` 会一起读旧资源库的图和作者说明。原神用 `#收益曲线帮助`，星铁用 `*参考面板帮助`。
 
