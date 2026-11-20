@@ -5,8 +5,8 @@ import { dirname, join } from "node:path";
 import { lockFile } from "../../lib/file-lock.ts";
 import { indexedTeamImages, pngHeader, teamGuideAuthors } from "./team-guides.ts";
 
-export const moraTeamSource = "https://gitee.com/Rrrrrrray/mora-plugin-res.git";
-export const moraSourceRef = "refs/heads/master";
+export const guideSource = "https://gitee.com/Rrrrrrray/mora-plugin-res.git";
+export const guideSourceRef = "refs/heads/master";
 const sourcePath = "Genshin/TeamGuides";
 const indexPath = "teamGuides.yaml";
 const gitId = /^[0-9a-f]{40}$/u;
@@ -66,7 +66,7 @@ function gitOptions(source: string) {
 
 function gitClient(directory: string, source: string, signal: AbortSignal) {
   const binary = Bun.which("git");
-  if (!binary) throw new Error("下载摩拉资源需要 Git。");
+  if (!binary) throw new Error("下载攻略资源需要 Git。");
   const env = gitOptions(source);
   return async (args: readonly string[], stdin?: Uint8Array, maxBuffer = maxIndex): Promise<Buffer> => {
     signal.throwIfAborted();
@@ -84,7 +84,7 @@ function gitClient(directory: string, source: string, signal: AbortSignal) {
     try {
       const [output, code] = await Promise.all([new Response(child.stdout).arrayBuffer(), child.exited]);
       signal.throwIfAborted();
-      if (code !== 0 || output.byteLength > maxBuffer) throw new Error(`无法读取上游摩拉资源（Git ${args[0]}）。`);
+      if (code !== 0 || output.byteLength > maxBuffer) throw new Error(`无法读取上游攻略资源（Git ${args[0]}）。`);
       return Buffer.from(output);
     } catch (error) {
       stop();
@@ -96,26 +96,26 @@ function gitClient(directory: string, source: string, signal: AbortSignal) {
   };
 }
 
-const moraFetch = ["--quiet", "--no-tags", "--no-write-fetch-head", "--no-recurse-submodules", "--no-auto-maintenance",
+const guideFetchOptions = ["--quiet", "--no-tags", "--no-write-fetch-head", "--no-recurse-submodules", "--no-auto-maintenance",
   "--filter=blob:none"] as const;
-function fetchFromMora(git: ReturnType<typeof gitClient>, arguments_: readonly string[], stdin?: Uint8Array) {
+function fetchGuideObjects(git: ReturnType<typeof gitClient>, arguments_: readonly string[], stdin?: Uint8Array) {
   return git(arguments_, stdin).catch(() => git(arguments_, stdin));
 }
 
-export async function prepareMoraGit(directory: string, source: string, signal: AbortSignal) {
+export async function prepareGuideSourceGit(directory: string, source: string, signal: AbortSignal) {
   const git = gitClient(directory, source, signal);
   await git(["init", "--quiet", "--bare", "--template="]);
   await git(["remote", "add", "origin", source]);
   await git(["config", "remote.origin.promisor", "true"]);
   await git(["config", "remote.origin.partialclonefilter", "blob:none"]);
-  await fetchFromMora(git, ["fetch", ...moraFetch, "--depth=1", "origin", `${moraSourceRef}:${moraSourceRef}`]);
+  await fetchGuideObjects(git, ["fetch", ...guideFetchOptions, "--depth=1", "origin", `${guideSourceRef}:${guideSourceRef}`]);
   return git;
 }
 
-export async function fetchMoraBlobs(git: ReturnType<typeof gitClient>, hashes: Iterable<string>): Promise<void> {
+export async function fetchGuideBlobs(git: ReturnType<typeof gitClient>, hashes: Iterable<string>): Promise<void> {
   const ids = [...new Set(hashes)];
   if (!ids.length) return;
-  await fetchFromMora(git, ["-c", "fetch.negotiationAlgorithm=noop", "fetch", ...moraFetch, "origin", "--stdin"],
+  await fetchGuideObjects(git, ["-c", "fetch.negotiationAlgorithm=noop", "fetch", ...guideFetchOptions, "origin", "--stdin"],
     Buffer.from(ids.join("\n") + "\n"));
 }
 
@@ -126,7 +126,7 @@ export function createTeamResources(options: {
   readonly source?: string;
 }) {
   const { root, fallback } = options;
-  const source = options.source ?? moraTeamSource;
+  const source = options.source ?? guideSource;
   let running: Promise<"current" | "updated"> | undefined;
 
   async function download(force: boolean): Promise<"current" | "updated"> {
@@ -138,13 +138,13 @@ export function createTeamResources(options: {
     let temporary: string | undefined;
     try {
       temporary = await mkdtemp(join(root, ".refresh-"));
-      const git = await prepareMoraGit(temporary, source, signal);
-      const tree = (await git(["rev-parse", "--verify", `${moraSourceRef}:${sourcePath}`])).toString().trim();
+      const git = await prepareGuideSourceGit(temporary, source, signal);
+      const tree = (await git(["rev-parse", "--verify", `${guideSourceRef}:${sourcePath}`])).toString().trim();
       if (!gitId.test(tree)) throw new Error("上游配队目录无效。");
       if (!force && (await managedSnapshot(root))?.tree === tree) return "current";
 
-      const objects = readGitTree((await git(["ls-tree", "-r", "-z", moraSourceRef, "--", sourcePath])).toString("utf8"));
-      await fetchMoraBlobs(git, objects.values());
+      const objects = readGitTree((await git(["ls-tree", "-r", "-z", guideSourceRef, "--", sourcePath])).toString("utf8"));
+      await fetchGuideBlobs(git, objects.values());
       const paths = new Map<string, Buffer>();
       let total = 0;
       for (const [file, hash] of objects) {

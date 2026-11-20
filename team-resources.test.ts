@@ -4,8 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { scheduledJobs } from "node-schedule";
+import { CommandRegistry } from "../../lib/commands.ts";
 import { createGuidesModule, startTeamResourceRefresh } from "./index.ts";
-import { createTeamResources, moraTeamSource } from "./team-resources.ts";
+import { createTeamResources, guideSource } from "./team-resources.ts";
 
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X9uoAAAAASUVORK5CYII=", "base64");
 const directory = "Genshin/TeamGuides";
@@ -43,7 +44,7 @@ test("分批从源 Git 读取配队文件，完整后切换，损坏与断网保
     }
     commit("初次发布");
     const resources = createTeamResources({ root: data, fallback, source: pathToFileURL(upstream).href });
-    expect(moraTeamSource).toBe("https://gitee.com/Rrrrrrray/mora-plugin-res.git");
+    expect(guideSource).toBe("https://gitee.com/Rrrrrrray/mora-plugin-res.git");
     expect(await resources.directory()).toBe(fallback);
     const pending = resources.refresh();
     expect(resources.refresh()).toBe(pending);
@@ -70,17 +71,24 @@ test("分批从源 Git 读取配队文件，完整后切换，损坏与断网保
     expect(await readFile(join(updated, "茗血茶", "万达国际.png"))).toEqual(nextImage);
     expect(await readFile(join(initial, "茗血茶", "万达国际.png"))).toEqual(PNG);
 
-    const { commands } = createGuidesModule({ directory: fallback, resources });
-    const update = commands["#更新摩拉资源"]!;
-    const force = commands["#强制更新摩拉资源"]!;
+    const registry = new CommandRegistry();
+    registry.registerModule(createGuidesModule({ directory: fallback, resources }));
+    const update = "#更新配队资源";
+    const force = "#强制更新配队资源";
     const owner = { message_type: "terminal", isMaster: true } as const;
-    expect(await update("", { ...owner, isMaster: false })).toContain("只有主人");
-    expect(await update("", owner)).toBe("摩拉配队资源已是最新。");
-    expect(await force("", owner)).toBe("摩拉配队资源已更新。");
+    for (const old of ["#更新摩拉资源", "#强制更新摩拉资源"]) {
+      expect(await registry.dispatch(old, owner)).toBeUndefined();
+      expect(await registry.dispatch(`${old} 参数`, owner)).toBeUndefined();
+    }
+    expect(await registry.dispatch(update, { ...owner, isMaster: false })).toContain("只有主人");
+    expect(await registry.dispatch(`${update} 参数`, owner)).toBe(`请发送 ${update}。`);
+    expect(await registry.dispatch(`${force} 参数`, owner)).toBe(`请发送 ${force}。`);
+    expect(await registry.dispatch(update, owner)).toBe("配队资源已是最新。");
+    expect(await registry.dispatch(force, owner)).toBe("配队资源已更新。");
 
     const latest = await resources.directory();
     await rename(upstream, upstream + "-offline");
-    expect(await update("", owner)).toBe("摩拉配队资源更新失败，仍使用已有资源。");
+    expect(await registry.dispatch(update, owner)).toBe("配队资源更新失败，仍使用已有资源。");
     expect(await resources.directory()).toBe(latest);
     expect((await readdir(data)).some((entry) => entry.startsWith(".refresh-"))).toBe(false);
   } finally {
@@ -99,7 +107,7 @@ test("缺包启动触发更新，已安装时每天北京时间三点加随机�
     directory: async () => "", wait: async () => {},
   }, handle.signal);
   try {
-    const name = Object.keys(scheduledJobs).find((key) => !existing.has(key) && key.startsWith("lotus-guides-mora-"));
+    const name = Object.keys(scheduledJobs).find((key) => !existing.has(key) && key.startsWith("lotus-guides-team-refresh-"));
     const job = name && scheduledJobs[name];
     if (!job) throw new Error("自动更新任务未安装。");
     const next = job.nextInvocation();

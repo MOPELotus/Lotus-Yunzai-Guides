@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { CommandReply } from "../../lib/commands.ts";
-import { parseGuideCommand } from "./role-guide-input.ts";
+import { parseGuideCommand, resolveGuideRole } from "./role-guide-input.ts";
 import { createRoleGuides } from "./role-guides.ts";
 import { createRoleReferences } from "./role-references.ts";
 
@@ -19,6 +19,7 @@ function git(cwd: string, ...args: string[]) {
 }
 
 test("三游戏保留旧攻略命令、配置源、本地覆盖及旧 Atlas，更新失败退回已有原图", async () => {
+  expect(resolveGuideRole("喵喵", "gs")).toMatchObject({ name: "迪奥娜", id: "10000039" });
   const root = await mkdtemp(join(tmpdir(), "lotus-role-guides-test-"));
   async function put(path: string, bytes: string | Uint8Array) {
     const file = join(root, path);
@@ -97,9 +98,9 @@ olds: [{source: 西风驿站, collection_id: [4]}]
     }) as typeof fetch;
     const search = createRoleGuides({
       cache, legacyStrategies: [join(root, "oldStrategy")], atlas: join(root, "atlas"), config: join(root, "config"),
-      moraSource: pathToFileURL(gitRoot).href, fetch: transport,
+      guideSource: pathToFileURL(gitRoot).href, fetch: transport,
     });
-    const reference = createRoleReferences({ cache, moraSource: pathToFileURL(gitRoot).href });
+    const reference = createRoleReferences({ cache, guideSource: pathToFileURL(gitRoot).href });
     expect(await search("岩王帝君攻略")).toEqual(forwarded("钟离攻略~", "钟离本地覆盖", "1.png", "341523.png", "钟离旧缓存"));
     expect(await search("#星铁萨姆一图流")).toEqual(forwarded("流萤攻略~", "流萤旧 Atlas", "2.png"));
     expect(requested).not.toContain("5");

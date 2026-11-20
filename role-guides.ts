@@ -1,8 +1,8 @@
 // Source precedence and legacy cache layout are from Mora-Plugin model/roleGuide.js.
 import { join } from "node:path";
 import type { CommandReply } from "../../lib/commands.ts";
-import { createMoraCollections } from "./mora-collection.ts";
-import { createMoraRolePack } from "./mora-role-pack.ts";
+import { createRoleGuideCollections } from "./role-guide-collections.ts";
+import { createRoleResourcePack } from "./role-resource-pack.ts";
 import { guideGames, parseGuideCommand, resolveGuideRole, safeGuideName, type GuideGame } from "./role-guide-input.ts";
 import { findGuidePack, readGuideImage, writeGuideFile, type GuideImage } from "./role-image-files.ts";
 
@@ -11,15 +11,15 @@ export function createRoleGuides(options: {
   readonly legacyStrategies?: readonly string[];
   readonly atlas?: string;
   readonly config?: string;
-  readonly moraPack?: string;
+  readonly guidePack?: string;
   readonly signal?: AbortSignal;
   readonly forward?: boolean;
   readonly fetch?: typeof fetch;
-  readonly moraSource?: string;
+  readonly guideSource?: string;
 }) {
-  const collections = createMoraCollections(options);
-  const rolePack = createMoraRolePack({
-    root: join(options.cache, "mora"), fallback: options.moraPack, upstream: options.moraSource, signal: options.signal,
+  const collections = createRoleGuideCollections(options);
+  const rolePack = createRoleResourcePack({
+    root: join(options.cache, "mora"), fallback: options.guidePack, upstream: options.guideSource, signal: options.signal,
   });
   const pending = new Map<string, Promise<CommandReply>>();
 
@@ -52,7 +52,7 @@ export function createRoleGuides(options: {
     const fromCollections = await Promise.all([...configured.news, ...configured.olds].map(async (author, index) => {
       const override = overrideMap.get(author.source);
       if (override) return override;
-      // Mora's bundled guide wins for its publisher. Legacy Atlas replaces the matching collection.
+      // A bundled guide wins for its publisher. Legacy Atlas replaces the matching collection.
       if (packedNames.has(author.source) || atlas?.source === author.source) return;
       const filename = role.name + ".jpg";
       const local = join(author.source, suffix, filename);

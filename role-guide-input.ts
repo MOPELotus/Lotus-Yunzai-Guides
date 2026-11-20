@@ -1,8 +1,8 @@
 // The old role command and traveler names are from Mora-Plugin.
-import { alias as genshinAliases } from "./miao-character-aliases.ts";
-import genshinNames from "./miao-character-names.json";
-import { alias as starrailAliases } from "./miao-starrail-aliases.js";
-import starrailNames from "./miao-starrail-names.json";
+import { alias as genshinAliases } from "./genshin-guide-aliases.ts";
+import genshinNames from "./genshin-guide-names.json";
+import { alias as starrailAliases } from "./starrail-guide-aliases.js";
+import starrailNames from "./starrail-guide-names.json";
 
 export const guideGames = {
   gs: { label: "原神", pack: "Genshin", config: "roleGuides.yaml" },

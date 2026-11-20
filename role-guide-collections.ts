@@ -40,7 +40,7 @@ async function readAuthors(game: GuideGame, root?: string) {
   if (root) {
     try { return parse(await readFile(join(root, filename), "utf8")); } catch {}
   }
-  return parse(await readFile(new URL(`./mora-source/${filename}`, import.meta.url), "utf8"));
+  return parse(await readFile(new URL(`./collection-defaults/${filename}`, import.meta.url), "utf8"));
 }
 
 async function responseBytes(response: Response, limit: number): Promise<Buffer> {
@@ -98,7 +98,7 @@ function selectImage(posts: readonly Record<string, unknown>[], role: GuideRole,
   return topicImage;
 }
 
-export function createMoraCollections(options: {
+export function createRoleGuideCollections(options: {
   readonly config?: string;
   readonly fetch?: typeof fetch;
   readonly signal?: AbortSignal;

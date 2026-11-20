@@ -44,11 +44,15 @@ test("原神区分公告分类，读取祈愿正文日期和绝对开服时间",
   expect(model.rows.at(-1)?.banner).toBeUndefined();
 });
 
-test("原神旧命令使用原国服公告，独立于星铁入口和缓存", async () => {
+test("原神日历使用原国服公告，旧品牌入口停用", async () => {
   const requests: string[] = [];
   const transport = (async (url: string) => { requests.push(url); return new Response(null, { status: 503 }); }) as typeof fetch;
   const command = createGenshinCalendar({ fetch: transport });
-  expect(await command("喵喵日历列表")).toContain("无法读取原神官方");
+  for (const name of ["喵喵日历", "喵喵日历列表", "#喵喵日历", "#喵喵日历列表"]) {
+    expect(command(name)).toBeUndefined();
+  }
+  expect(requests).toEqual([]);
+  expect(await command("#日历列表")).toContain("无法读取原神官方");
   expect(requests).toEqual([genshinCalendarListUrl, genshinCalendarContentUrl]);
   expect(command("#星铁日历")).toBeUndefined();
 });

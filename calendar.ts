@@ -4,7 +4,7 @@ import { createCalendarSource, type CalendarGame } from "./calendar-data.ts";
 
 const games = {
   starrail: { label: "星铁", rule: /^#星铁日历(列表)?$/u, theme: "LOTUS_STAR_RAIL_GACHA_THEME_DIR" },
-  genshin: { label: "原神", rule: /^(?:#|喵喵)+日历(列表)?$/u, theme: "LOTUS_GENSHIN_GACHA_THEME_DIR" },
+  genshin: { label: "原神", rule: /^#+日历(列表)?$/u, theme: "LOTUS_GENSHIN_GACHA_THEME_DIR" },
   zzz: { label: "绝区零", rule: /^#绝区零日历(列表)?$/u, theme: "LOTUS_ZZZ_CALENDAR_THEME_DIR" },
 } as const;
 

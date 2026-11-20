@@ -23,21 +23,21 @@ export function createGuidesModule(options: {
 }): CommandModule {
   const { resources } = options;
   const refresh = (force: boolean) => async (argument: string, { isMaster }: { isMaster: boolean }) => {
-    if (!isMaster) return "只有主人可以更新摩拉资源。";
-    if (argument) return force ? "请发送 #强制更新摩拉资源。" : "请发送 #更新摩拉资源。";
+    if (!isMaster) return "只有主人可以更新配队资源。";
+    if (argument) return force ? "请发送 #强制更新配队资源。" : "请发送 #更新配队资源。";
     if (!resources) return "当前使用指定的配队资源目录。";
     try {
       const state = await resources.refresh(force);
-      return state === "current" ? "摩拉配队资源已是最新。" : "摩拉配队资源已更新。";
+      return state === "current" ? "配队资源已是最新。" : "配队资源已更新。";
     } catch {
-      return await resources.available() ? "摩拉配队资源更新失败，仍使用已有资源。" : "摩拉配队资源下载失败，请稍后重试。";
+      return await resources.available() ? "配队资源更新失败，仍使用已有资源。" : "配队资源下载失败，请稍后重试。";
     }
   };
   return {
     name: "@lotus-yunzai/guides",
     commands: {
-      "#更新摩拉资源": refresh(false),
-      "#强制更新摩拉资源": refresh(true),
+      "#更新配队资源": refresh(false),
+      "#强制更新配队资源": refresh(true),
     },
     async fallback(message, { normalizedMessage }) {
       const command = normalizedMessage || message;
@@ -59,12 +59,12 @@ export function startTeamResourceRefresh(resources: TeamResources, signal: Abort
   async function update() {
     if (signal.aborted) return;
     try {
-      if (await resources.refresh() === "updated") console.info("[guides] 摩拉配队资源已更新。");
+      if (await resources.refresh() === "updated") console.info("[guides] 配队资源已更新。");
     } catch (error) {
-      if (!signal.aborted) console.warn("[guides] 摩拉配队资源更新失败，保留已有资源。", error instanceof Error ? error.message : "");
+      if (!signal.aborted) console.warn("[guides] 配队资源更新失败，保留已有资源。", error instanceof Error ? error.message : "");
     }
   }
-  const job = new Job(`lotus-guides-mora-${crypto.randomUUID()}`, () => {
+  const job = new Job(`lotus-guides-team-refresh-${crypto.randomUUID()}`, () => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => { void update(); }, Math.floor(Math.random() * 3_600_000));
     timer.unref();
@@ -107,7 +107,7 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
     cache: Bun.env.LOTUS_GUIDES_ROLE_DIR?.trim() || data("../../data/guides/roleGuides/"),
     config: Bun.env.LOTUS_GUIDES_ROLE_CONFIG_DIR?.trim() || data("../../config/guides/"),
     atlas: Bun.env.LOTUS_GUIDES_LEGACY_ATLAS_DIR?.trim() || data("../../data/guides/legacy-atlas/"),
-    moraPack: Bun.env.LOTUS_GUIDES_MORA_PACK_DIR?.trim() || data("../../data/guides/mora-plugin-res/"),
+    guidePack: Bun.env.LOTUS_GUIDES_MORA_PACK_DIR?.trim() || data("../../data/guides/mora-plugin-res/"),
     legacyStrategies: [data("../../temp/strategy/"), data("../../data/strategy/")],
     signal: refreshSignal, forward,
   };

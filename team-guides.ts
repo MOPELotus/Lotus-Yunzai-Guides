@@ -4,8 +4,8 @@ import { constants } from "node:fs";
 import { open, realpath } from "node:fs/promises";
 import { isAbsolute, join, relative, sep } from "node:path";
 import type { CommandReply } from "../../lib/commands.ts";
-import { alias } from "./miao-character-aliases.ts";
-import characterNames from "./miao-character-names.json";
+import { alias } from "./genshin-guide-aliases.ts";
+import characterNames from "./genshin-guide-names.json";
 
 type Team = { readonly alias: readonly string[]; readonly role: readonly string[] };
 type TeamIndex = {

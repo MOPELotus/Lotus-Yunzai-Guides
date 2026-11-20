@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import type { CommandReply } from "../../lib/commands.ts";
 import type { MessageReply } from "../../lib/messages.ts";
-import { createMoraRolePack, referenceNotes } from "./mora-role-pack.ts";
+import { createRoleResourcePack, referenceNotes } from "./role-resource-pack.ts";
 import { resolveGuideRole, safeGuideName, type GuideGame } from "./role-guide-input.ts";
 
 const genshinHelp = [
@@ -30,14 +30,14 @@ function readNotes(bytes: Buffer | undefined, name: string) {
 
 export function createRoleReferences(options: {
   readonly cache: string;
-  readonly moraPack?: string;
+  readonly guidePack?: string;
   readonly signal?: AbortSignal;
   readonly forward?: boolean;
-  readonly moraSource?: string;
+  readonly guideSource?: string;
 }) {
-  const pack = createMoraRolePack({
-    root: join(options.cache, "mora-reference"), references: true, fallback: options.moraPack,
-    upstream: options.moraSource, signal: options.signal,
+  const pack = createRoleResourcePack({
+    root: join(options.cache, "mora-reference"), references: true, fallback: options.guidePack,
+    upstream: options.guideSource, signal: options.signal,
   });
 
   async function help(game: GuideGame): Promise<CommandReply> {
