@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import type { CommandReply } from "../../lib/commands.ts";
 import { createRoleGuideCollections } from "./role-guide-collections.ts";
-import { createRoleResourcePack, type RolePackFallback } from "./role-resource-pack.ts";
+import { createRoleResourcePack, type RolePackFallback, type RolePackSnapshot } from "./role-resource-pack.ts";
 import { guideGames, parseGuideCommand, resolveGuideRole, safeGuideName, type GuideGame } from "./role-guide-input.ts";
 import { findGuidePack, readGuideImage, writeGuideFile, type GuideImage } from "./role-image-files.ts";
 
@@ -12,6 +12,8 @@ export function createRoleGuides(options: {
   readonly atlas?: string;
   readonly config?: string;
   readonly guidePack?: RolePackFallback;
+  readonly guideSnapshot?: RolePackSnapshot;
+  readonly guideAutomatic?: boolean;
   readonly signal?: AbortSignal;
   readonly forward?: boolean;
   readonly fetch?: typeof fetch;
@@ -19,7 +21,9 @@ export function createRoleGuides(options: {
 }) {
   const collections = createRoleGuideCollections(options);
   const rolePack = createRoleResourcePack({
-    root: join(options.cache, "mora"), fallback: options.guidePack, upstream: options.guideSource, signal: options.signal,
+    root: join(options.cache, "mora"), fallback: options.guidePack, snapshot: options.guideSnapshot,
+    automatic: options.guideAutomatic,
+    upstream: options.guideSource, signal: options.signal,
   });
   const pending = new Map<string, Promise<CommandReply>>();
 

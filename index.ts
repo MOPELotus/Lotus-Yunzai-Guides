@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { Job } from "node-schedule";
 import type { CommandModule } from "../../lib/commands.ts";
 import type { MessageSegment } from "../../lib/messages.ts";
@@ -6,6 +7,7 @@ import { teamGuides } from "./team-guides.ts";
 import { createTeamResources } from "./team-resources.ts";
 import { createRoleGuides } from "./role-guides.ts";
 import { createRoleReferences } from "./role-references.ts";
+import { createOriginalRoleResources } from "./original-role-resources.ts";
 import { createGenshinCalendar, createStarrailCalendar, createZzzCalendar } from "./calendar.ts";
 import { createCalendarSchedule, type CalendarSchedule, type CalendarScheduleOptions } from "./calendar-schedule.ts";
 
@@ -55,27 +57,45 @@ export function createGuidesModule(options: {
 }
 
 export function startTeamResourceRefresh(resources: TeamResources, signal: AbortSignal) {
+  return startResourceRefresh(resources, signal, "team", "配队资源");
+}
+
+function startResourceRefresh(resources: Pick<TeamResources, "refresh" | "initialized" | "wait">,
+  signal: AbortSignal, kind: string, label: string) {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let retry: ReturnType<typeof setTimeout> | undefined;
+  let delay = 60_000;
+  let updating = false;
   async function update() {
-    if (signal.aborted) return;
+    if (signal.aborted || updating) return;
+    updating = true;
+    if (retry) clearTimeout(retry);
     try {
-      if (await resources.refresh() === "updated") console.info("[guides] 配队资源已更新。");
+      if (await resources.refresh() === "updated") console.info(`[guides] ${label}已更新。`);
+      delay = 60_000;
     } catch (error) {
-      if (!signal.aborted) console.warn("[guides] 配队资源更新失败，保留已有资源。", error instanceof Error ? error.message : "");
+      if (signal.aborted) return;
+      console.warn(`[guides] ${label}更新失败，保留已有资源。`, error instanceof Error ? error.message : "");
+      retry = setTimeout(() => { void update(); }, delay);
+      retry.unref();
+      delay = Math.min(delay * 2, 3_600_000);
+    } finally {
+      updating = false;
     }
   }
-  const job = new Job(`lotus-guides-team-refresh-${crypto.randomUUID()}`, () => {
+  const job = new Job(`lotus-guides-${kind}-refresh-${crypto.randomUUID()}`, () => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => { void update(); }, Math.floor(Math.random() * 3_600_000));
     timer.unref();
   });
   if (!signal.aborted) {
     job.schedule({ rule: "0 0 3 * * *", tz: "Asia/Shanghai" });
-    void resources.initialized().then((ready) => { if (!ready) return update(); });
+    void resources.initialized().catch(() => false).then((ready) => { if (!ready) return update(); });
   }
   const stop = () => {
     job.cancel();
     if (timer) clearTimeout(timer);
+    if (retry) clearTimeout(retry);
   };
   signal.addEventListener("abort", stop, { once: true });
   return async () => {
@@ -103,12 +123,20 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
   const controller = new AbortController();
   const refreshSignal = AbortSignal.any([signal, controller.signal]);
   const data = (path: string) => fileURLToPath(new URL(path, import.meta.url));
+  const cache = Bun.env.LOTUS_GUIDES_ROLE_DIR?.trim() || data("../../data/guides/roleGuides/");
+  const configuredPack = Bun.env.LOTUS_GUIDES_MORA_PACK_DIR?.trim();
+  const guideAutomatic = !!guidesSchedule && Bun.env.LOTUS_GUIDES_AUTO_UPDATE !== "0";
+  const guidePack = configuredPack ? [configuredPack] : [data("../../data/guides/mora-plugin-res/"),
+    data("../mora-plugin/resources/mora-plugin-res/")];
+  const original = createOriginalRoleResources({ root: data("../../data/guides/role-origin/"),
+    cache, fallbacks: guidePack, signal: refreshSignal });
   const guideOptions = {
-    cache: Bun.env.LOTUS_GUIDES_ROLE_DIR?.trim() || data("../../data/guides/roleGuides/"),
+    cache,
     config: Bun.env.LOTUS_GUIDES_ROLE_CONFIG_DIR?.trim() || data("../../config/guides/"),
     atlas: Bun.env.LOTUS_GUIDES_LEGACY_ATLAS_DIR?.trim() || data("../../data/guides/legacy-atlas/"),
-    guidePack: Bun.env.LOTUS_GUIDES_MORA_PACK_DIR?.trim() || [data("../../data/guides/mora-plugin-res/"),
-      data("../mora-plugin/resources/mora-plugin-res/")],
+    guidePack,
+    guideSnapshot: original.current,
+    guideAutomatic,
     legacyStrategies: [data("../../temp/strategy/"), data("../../data/strategy/")],
     signal: refreshSignal, forward,
   };
@@ -117,7 +145,8 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
   const starrailCalendar = createStarrailCalendar({ signal: refreshSignal });
   const genshinCalendar = createGenshinCalendar({ signal: refreshSignal });
   const zzzCalendar = createZzzCalendar({ signal: refreshSignal });
-  const resources = directory ? undefined : createTeamResources({ root, fallback: legacyDirectory, signal: refreshSignal });
+  const resources = directory ? undefined : createTeamResources({ root, fallback: legacyDirectory,
+    alternatives: guidePack.map(pack => join(pack, "Genshin", "TeamGuides")), signal: refreshSignal });
   const scheduled = guidesSchedule && await createCalendarSchedule({
     signal: refreshSignal, root: new URL("../../", import.meta.url), lockFile,
     register: guidesSchedule.registerTask, targets: guidesSchedule.targets,
@@ -136,8 +165,11 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
   });
   const unregister = scheduled && !refreshSignal.aborted ? guidesSchedule?.register(scheduled) : undefined;
   let stop: ReturnType<typeof startTeamResourceRefresh> | undefined;
-  const cancelStart = resources && Bun.env.LOTUS_GUIDES_AUTO_UPDATE !== "0" && guidesSchedule?.whenReady(() => {
-    if (!refreshSignal.aborted) stop = startTeamResourceRefresh(resources, refreshSignal);
+  let stopOriginal: ReturnType<typeof startResourceRefresh> | undefined;
+  const cancelStart = guideAutomatic && guidesSchedule?.whenReady(() => {
+    if (refreshSignal.aborted) return;
+    if (resources) stop = startTeamResourceRefresh(resources, refreshSignal);
+    stopOriginal = startResourceRefresh(original, refreshSignal, "role", "角色和进阶攻略资源");
   });
   return {
     ...createGuidesModule({ directory: directory ?? legacyDirectory, forward, resources, roleGuides, roleReferences, starrailCalendar, genshinCalendar, zzzCalendar }),
@@ -146,6 +178,7 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
       if (cancelStart) cancelStart();
       unregister?.();
       await scheduled?.stop();
+      await stopOriginal?.();
       if (stop) await stop();
       else await resources?.wait();
     },

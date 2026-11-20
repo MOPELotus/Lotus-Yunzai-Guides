@@ -4,7 +4,9 @@
 
 `#钟离攻略`、`*流萤攻略` 和 `%艾莲一图流` 分别查询原神、星铁和绝区零的角色攻略。也可以用角色别名或 `#星铁`、`#绝区零` 前缀。用 `#更新钟离攻略`、`*更新流萤攻略` 或 `%更新艾莲一图流` 重新检查原资源仓和作者合集，无需等合集列表的两分钟缓存过期。更新失败时会尝试使用本机已有原图。
 
-缺少本地原图时，首次查询按角色读取旧 Mora 资源仓。已有原图的普通查询先使用本地版本，缓存到期后在后台检查，只下载有变化的原图。米游社攻略沿用 Mora 的作者合集。缓存和自定义图默认放在 `data/guides/roleGuides/`，可用 `LOTUS_GUIDES_ROLE_DIR` 改路径。自定义图放在 `add_ons/<作者>/<角色>.<扩展名>`，星铁和绝区零在作者目录下分别多一层 `StarRail/` 和 `ZenlessZoneZero/`。同一作者的自定义图优先。
+宿主就绪后在后台从原 Gitee 资源仓准备三款游戏的角色攻略和进阶参考。每天北京时间 03:00 至 04:00 检查更新，已有文件按 Git 内容哈希复用，只下载缺少或变化的原图。断线后保留已下载的文件及正在使用的版本，恢复后继续下载。准备期间也可查询，已有原图直接发送，缺少的角色可按需从原源读取。米游社攻略沿用原作者合集，按角色读取及刷新。
+
+自动同步的角色和进阶原图保存在 `data/guides/role-origin/`。按角色缓存和自定义图默认放在 `data/guides/roleGuides/`，可用 `LOTUS_GUIDES_ROLE_DIR` 改路径。自定义图放在 `add_ons/<作者>/<角色>.<扩展名>`，星铁和绝区零在作者目录下分别多一层 `StarRail/` 和 `ZenlessZoneZero/`。同一作者的自定义图优先。
 
 要沿用原有合集配置，将 `roleGuides.yaml`、`srRoleGuides.yaml` 和 `zzzRoleGuides.yaml` 放进 `config/guides/`。也可用 `LOTUS_GUIDES_ROLE_CONFIG_DIR` 指定旧插件的配置目录。旧 `temp/strategy/` 与 `data/strategy/` 中的原神图可以继续读。旧 Atlas 目录可用 `LOTUS_GUIDES_LEGACY_ATLAS_DIR` 指定。原资源包默认依次从 `data/guides/mora-plugin-res/` 和旧部署的 `plugins/mora-plugin/resources/mora-plugin-res/` 读取，可用 `LOTUS_GUIDES_MORA_PACK_DIR` 指定自己的副本。
 
@@ -16,7 +18,7 @@
 
 首次启动会从原 Gitee 仓库下载配队索引与原图。之后每天北京时间 03:00 至 04:00 检查更新，资源保存在宿主的 `data/guides/mora/`。下载失败时，继续使用已有版本。主人也可发送 `#更新配队资源`，需要重新拉取当前版本时发送 `#强制更新配队资源`。
 
-从旧部署迁移时，可把已有的 `Genshin/TeamGuides/` 放到 `data/guides/Genshin/TeamGuides/`，首次下载完成前会读取这个目录。希望只使用指定目录时，启动前设置 `LOTUS_GUIDES_TEAM_DIR`。如只想暂停自动更新并保留主人更新指令，可设置 `LOTUS_GUIDES_AUTO_UPDATE=0`。
+从旧部署迁移时，可把已有的 `Genshin/TeamGuides/` 放到 `data/guides/Genshin/TeamGuides/`，首次下载完成前也会尝试读取旧资源包。希望配队只使用指定目录时，启动前设置 `LOTUS_GUIDES_TEAM_DIR`。如需暂停角色、进阶和配队的后台同步，可设置 `LOTUS_GUIDES_AUTO_UPDATE=0`。手动更新仍可用。
 
 ## 活动日历
 

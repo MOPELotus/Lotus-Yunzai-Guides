@@ -1,9 +1,11 @@
 // Source and refresh schedule adapted from Mora-Plugin apps/help.js.
-import { lstat, mkdir, mkdtemp, readlink, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readdir, readlink, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { devNull } from "node:os";
 import { dirname, join } from "node:path";
 import { lockFile } from "../../lib/file-lock.ts";
-import { indexedTeamImages, pngHeader, teamGuideAuthors } from "./team-guides.ts";
+import { indexedTeamImages, pngHeader, readResource, teamGuideAuthors } from "./team-guides.ts";
+import { writeGuideFile } from "./role-image-files.ts";
 
 export const guideSource = "https://gitee.com/Rrrrrrray/mora-plugin-res.git";
 export const guideSourceRef = "refs/heads/master";
@@ -14,6 +16,7 @@ const snapshotName = /^snapshots\/([0-9a-f]{40})-[0-9a-f-]{36}$/u;
 const maxImage = 16 * 1024 * 1024;
 const maxIndex = 1024 * 1024;
 const maxSnapshot = 128 * 1024 * 1024;
+const freshness = 24 * 60 * 60 * 1000;
 
 function resourcePaths(file: string): boolean {
   if (file === indexPath) return true;
@@ -51,6 +54,26 @@ async function managedSnapshot(root: string) {
   }
 }
 
+export function guideBlobId(bytes: Buffer) {
+  return createHash("sha1").update(`blob ${bytes.byteLength}\0`).update(bytes).digest("hex");
+}
+
+export async function readLocalGuideBlob(directory: string, file: string, hash: string, limit: number) {
+  try {
+    const path = await realpath(directory);
+    const bytes = await readResource(path, join(path, file), limit);
+    if (guideBlobId(bytes) === hash) return bytes;
+  } catch {}
+}
+
+export async function cleanGuideStages(root: string, prefix: ".refresh-" | ".install-") {
+  for (const entry of await readdir(root, { withFileTypes: true })) {
+    if (entry.isDirectory() && entry.name.startsWith(prefix) && /^[a-z0-9]{6}$/iu.test(entry.name.slice(prefix.length))) {
+      await rm(join(root, entry.name), { recursive: true, force: true });
+    }
+  }
+}
+
 function gitOptions(source: string) {
   const protocol = new URL(source).protocol;
   if (protocol !== "https:" && protocol !== "file:") throw new Error("配队资源 Git 协议不受支持。");
@@ -65,7 +88,7 @@ function gitOptions(source: string) {
 }
 
 function gitClient(directory: string, source: string, signal: AbortSignal) {
-  const binary = Bun.which("git");
+  const binary = Bun.which("git", { PATH: process.env.PATH });
   if (!binary) throw new Error("下载攻略资源需要 Git。");
   const env = gitOptions(source);
   return async (args: readonly string[], stdin?: Uint8Array, maxBuffer = maxIndex): Promise<Buffer> => {
@@ -122,12 +145,27 @@ export async function fetchGuideBlobs(git: ReturnType<typeof gitClient>, hashes:
 export function createTeamResources(options: {
   readonly root: string;
   readonly fallback: string;
+  readonly alternatives?: readonly string[];
   readonly signal?: AbortSignal;
   readonly source?: string;
 }) {
   const { root, fallback } = options;
   const source = options.source ?? guideSource;
+  const fallbacks = [fallback, ...(options.alternatives ?? [])];
+  const objectDirectory = join(root, "objects");
+  const pending = join(root, "pending");
+  const checked = join(root, "checked");
   let running: Promise<"current" | "updated"> | undefined;
+
+  async function fallbackDirectory() {
+    for (const directory of fallbacks) {
+      try {
+        const base = await realpath(directory);
+        const index = await readResource(base, join(base, indexPath), maxIndex);
+        if (indexedTeamImages(index.toString("utf8")).length) return directory;
+      } catch {}
+    }
+  }
 
   async function download(force: boolean): Promise<"current" | "updated"> {
     const timeout = AbortSignal.timeout(180_000);
@@ -137,36 +175,64 @@ export function createTeamResources(options: {
     const lock = await lockFile(join(root, "refresh.lock"), "配队资源");
     let temporary: string | undefined;
     try {
+      await cleanGuideStages(root, ".refresh-");
+      await writeGuideFile(pending, "");
       temporary = await mkdtemp(join(root, ".refresh-"));
       const git = await prepareGuideSourceGit(temporary, source, signal);
       const tree = (await git(["rev-parse", "--verify", `${guideSourceRef}:${sourcePath}`])).toString().trim();
       if (!gitId.test(tree)) throw new Error("上游配队目录无效。");
-      if (!force && (await managedSnapshot(root))?.tree === tree) return "current";
+      const previous = await managedSnapshot(root);
+      if (!force && previous?.tree === tree) {
+        await writeGuideFile(checked, "");
+        await rm(pending, { force: true });
+        return "current";
+      }
 
       const objects = readGitTree((await git(["ls-tree", "-r", "-z", guideSourceRef, "--", sourcePath])).toString("utf8"));
-      await fetchGuideBlobs(git, objects.values());
-      const paths = new Map<string, Buffer>();
+      const known = new Map<string, Buffer>();
       let total = 0;
-      for (const [file, hash] of objects) {
-        const limit = file === indexPath ? maxIndex : maxImage;
-        const size = Number((await git(["cat-file", "-s", hash])).toString().trim());
-        if (!Number.isSafeInteger(size) || size < 1 || size > limit || total + size > maxSnapshot) {
-          throw new Error("上游配队文件大小无效。");
-        }
-        const bytes = await git(["cat-file", "blob", hash], undefined, limit);
-        if (size !== bytes.byteLength || (file !== indexPath && !bytes.subarray(0, 8).equals(pngHeader))) {
-          throw new Error("上游配队文件不完整。");
-        }
-        total += size;
-        paths.set(file, bytes);
+      function retain(hash: string, bytes: Buffer) {
+        total += bytes.byteLength;
+        if (total > maxSnapshot) throw new Error("上游配队文件大小无效。");
+        known.set(hash, bytes);
       }
-      const index = paths.get(indexPath);
-      if (!index) throw new Error("上游缺少配队索引。");
+      const localDirectories = previous ? [previous.directory, ...fallbacks] : fallbacks;
+      for (const [file, hash] of objects) {
+        if (known.has(hash)) continue;
+        const limit = file === indexPath ? maxIndex : maxImage;
+        let bytes = await readLocalGuideBlob(objectDirectory, hash, hash, limit);
+        for (const directory of localDirectories) {
+          if (bytes) break;
+          bytes = await readLocalGuideBlob(directory, file, hash, limit);
+        }
+        if (bytes) retain(hash, bytes);
+      }
+      const missing = [...new Map([...objects].filter(([, hash]) => !known.has(hash)).map(([file, hash]) => [hash, file]))];
+      for (let start = 0; start < missing.length; start += 8) {
+        const batch = missing.slice(start, start + 8);
+        await fetchGuideBlobs(git, batch.map(([hash]) => hash));
+        for (const [hash, file] of batch) {
+          const bytes = await git(["cat-file", "blob", hash], undefined, file === indexPath ? maxIndex : maxImage);
+          if (guideBlobId(bytes) !== hash || (file !== indexPath && !bytes.subarray(0, 8).equals(pngHeader))) {
+            throw new Error("上游配队文件不完整。");
+          }
+          signal.throwIfAborted();
+          retain(hash, bytes);
+          await writeGuideFile(join(objectDirectory, hash), bytes);
+        }
+      }
+      const index = known.get(objects.get(indexPath)!);
+      if (!index || index.byteLength > maxIndex) throw new Error("上游缺少可用的配队索引。");
       const expected = indexedTeamImages(index.toString("utf8"));
-      if (!expected.length || expected.some((file) => !paths.has(file))) throw new Error("上游配队索引缺少原图。");
+      if (!expected.length || expected.some((file) => !objects.has(file))) throw new Error("上游配队索引缺少原图。");
 
       const stage = join(temporary, "stage");
-      for (const [file, bytes] of paths) {
+      let size = 0;
+      for (const [file, hash] of objects) {
+        const bytes = known.get(hash);
+        if (!bytes || (file !== indexPath && !bytes.subarray(0, 8).equals(pngHeader))) throw new Error("上游配队文件不完整。");
+        size += bytes.byteLength;
+        if (size > maxSnapshot) throw new Error("上游配队文件大小无效。");
         const target = join(stage, file);
         await mkdir(dirname(target), { recursive: true });
         await writeFile(target, bytes, { flag: "wx" });
@@ -178,6 +244,8 @@ export function createTeamResources(options: {
       signal.throwIfAborted();
       await rename(stage, join(root, next));
       await rename(pointer, join(root, "current"));
+      await writeGuideFile(checked, "");
+      await rm(pending, { force: true });
       return "updated";
     } finally {
       try {
@@ -196,10 +264,14 @@ export function createTeamResources(options: {
   }
 
   return {
-    async directory() { return (await managedSnapshot(root))?.directory ?? fallback; },
-    async initialized() { return (await managedSnapshot(root)) !== undefined; },
+    async directory() { return (await managedSnapshot(root))?.directory ?? await fallbackDirectory() ?? fallback; },
+    async initialized() {
+      if (await Bun.file(pending).exists() || !(await managedSnapshot(root))) return false;
+      const stat = await lstat(checked).catch(() => undefined);
+      return stat !== undefined && Date.now() - stat.mtimeMs < freshness;
+    },
     async available() {
-      return (await managedSnapshot(root)) !== undefined || await Bun.file(join(fallback, indexPath)).exists();
+      return (await managedSnapshot(root)) !== undefined || (await fallbackDirectory()) !== undefined;
     },
     refresh,
     async wait() { await running?.catch(() => {}); },

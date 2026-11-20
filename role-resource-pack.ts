@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { lockFile } from "../../lib/file-lock.ts";
 import { guideGames, safeGuideName, type GuideGame } from "./role-guide-input.ts";
 import { findGuidePack, isGuideImage, matchesGuideImage, readGuideFile, roleImageLimit, writeGuideFile, type GuideImage } from "./role-image-files.ts";
-import { fetchGuideBlobs, guideSourceRef, guideSource, prepareGuideSourceGit } from "./team-resources.ts";
+import { fetchGuideBlobs, guideBlobId, guideSourceRef, guideSource, prepareGuideSourceGit } from "./team-resources.ts";
 
 const revision = /^[0-9a-f]{40}$/u;
 type Blob = { readonly source: string; readonly hash: string };
@@ -12,6 +12,7 @@ const refreshAfter = 24 * 60 * 60 * 1000;
 const retryAfter = 120_000;
 export const referenceNotes = "RefStat:RefNotes.yaml";
 export type RolePackFallback = string | readonly string[];
+export type RolePackSnapshot = () => Promise<{ readonly directory: string; readonly checkedAt: number } | undefined>;
 const notesLimit = 128 * 1024;
 
 function hasImage(files: readonly GuideImage[]): boolean {
@@ -71,6 +72,8 @@ async function readReferenceFallback(root: string, game: GuideGame, name: string
 export function createRoleResourcePack(options: {
   readonly root: string;
   readonly fallback?: RolePackFallback;
+  readonly snapshot?: RolePackSnapshot;
+  readonly automatic?: boolean;
   readonly upstream?: string;
   readonly signal?: AbortSignal;
   readonly references?: boolean;
@@ -79,10 +82,15 @@ export function createRoleResourcePack(options: {
   const recentAttempts = new Map<string, number>();
   const fallbacks = typeof options.fallback === "string" ? [options.fallback] : options.fallback ?? [];
 
+  async function directoryFiles(root: string, game: GuideGame, name: string) {
+    const local = join(root, guideGames[game].pack, "Roles");
+    return options.references ? readReferenceFallback(local, game, name) : findGuidePack(join(local, "Guides"), name);
+  }
+
   async function localFiles(game: GuideGame, name: string) {
-    for (const root of fallbacks) {
-      const local = join(root, guideGames[game].pack, "Roles");
-      const files = options.references ? await readReferenceFallback(local, game, name) : await findGuidePack(join(local, "Guides"), name);
+    const snapshot = await options.snapshot?.();
+    for (const root of snapshot ? [snapshot.directory, ...fallbacks] : fallbacks) {
+      const files = await directoryFiles(root, game, name);
       if (hasImage(files)) return files;
     }
     return [];
@@ -120,21 +128,35 @@ export function createRoleResourcePack(options: {
           files.set(source, hash);
         }
         if (files.size > 24) throw new Error("角色攻略来源数超限。");
-        const missing = [...new Set(files.values())].filter((hash) => !current?.files.some((file) => file.hash === hash));
-        await fetchGuideBlobs(git, missing);
-        const cached = new Map(current?.files.map(({ hash }, i) => [hash, current.images[i]?.bytes]));
+        const persisted = new Map<string, Buffer>();
+        for (const [index, { hash }] of (current?.files ?? []).entries()) {
+          const bytes = current?.images[index]?.bytes;
+          if (bytes && guideBlobId(bytes) === hash) persisted.set(hash, bytes);
+        }
+        const matching = new Map(persisted);
+        const ids = new Set(files.values());
+        if ([...ids].some((hash) => !matching.has(hash))) {
+          for (const { bytes } of await localFiles(game, name)) {
+            const hash = guideBlobId(bytes);
+            if (ids.has(hash)) matching.set(hash, bytes);
+          }
+        }
+        await fetchGuideBlobs(git, [...ids].filter((hash) => !matching.has(hash)));
         const results: GuideImage[] = [];
         let total = 0;
         for (const [source, hash] of files) {
-          let bytes = cached.get(hash);
+          let bytes = matching.get(hash);
           if (!bytes) {
             const limit = source === referenceNotes ? notesLimit : roleImageLimit;
             const size = Number((await git(["cat-file", "-s", hash])).toString().trim());
             if (!Number.isSafeInteger(size) || size < 1 || size > limit) throw new Error("角色攻略资源大小无效。");
             bytes = await git(["cat-file", "blob", hash], undefined, limit);
-            if (bytes.byteLength !== size || !validFile(source, bytes)) throw new Error("角色攻略资源不完整。");
+            if (bytes.byteLength !== size || guideBlobId(bytes) !== hash || !validFile(source, bytes)) throw new Error("角色攻略资源不完整。");
+          }
+          if (!persisted.has(hash)) {
             signal.throwIfAborted();
             await writeGuideFile(join(directory, hash), bytes);
+            persisted.set(hash, bytes);
           }
           total += bytes.byteLength;
           if (total > 48 * 1024 * 1024) throw new Error("角色攻略原图总大小超限。");
@@ -176,11 +198,17 @@ export function createRoleResourcePack(options: {
     const key = `${game}/${name}`;
     const existing = await readPack(join(options.root, guideGames[game].pack, name));
     if (force) return refresh(key, game, name, true, existing);
+    const snapshot = await options.snapshot?.();
+    if (snapshot) {
+      if (existing && existing.checkedAt >= snapshot.checkedAt && hasImage(existing.images)) return existing.images;
+      const images = await directoryFiles(snapshot.directory, game, name);
+      if (hasImage(images)) return images;
+    }
     if (existing && Date.now() - existing.checkedAt < refreshAfter) return existing.images;
 
     const cached = existing && hasImage(existing.images) ? existing.images : await localFiles(game, name);
     if (!cached.length) return refresh(key, game, name, false, existing);
-    if (!options.signal?.aborted && Date.now() - (recentAttempts.get(key) ?? 0) >= retryAfter) {
+    if (!options.automatic && !options.signal?.aborted && Date.now() - (recentAttempts.get(key) ?? 0) >= retryAfter) {
       // Keep a verified local image usable while the original source refreshes.
       void refresh(key, game, name, false, existing).catch(() => {});
     }
