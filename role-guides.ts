@@ -65,7 +65,7 @@ export function createRoleGuides(options: {
         }
       }
       if (saved && !update) return { source: author.source, bytes: saved };
-      const bytes = await collections.image(role, author);
+      const bytes = await collections.image(role, author, update);
       if (bytes) {
         await writeGuideFile(join(options.cache, local), bytes).catch(() => {});
         return { source: author.source, bytes };
@@ -91,10 +91,13 @@ export function createRoleGuides(options: {
     const role = resolveGuideRole(command.role, command.game);
     if (!role || typeof role === "string") return role;
     if (!safeGuideName(role.name)) return;
-    const key = `${command.game}/${role.name}/${command.update}`;
-    let operation = pending.get(key);
+    const roleKey = `${command.game}/${role.name}`;
+    const refreshKey = `${roleKey}/true`;
+    const key = command.update ? refreshKey : `${roleKey}/false`;
+    let operation = pending.get(refreshKey) ?? pending.get(key);
     if (!operation) {
-      operation = lookup(command.game, role, command.update).catch(() =>
+      const inFlight = command.update ? pending.get(`${roleKey}/false`) : undefined;
+      operation = Promise.resolve(inFlight).then(() => lookup(command.game, role, command.update)).catch(() =>
         `暂时无法取得${role.name}的${guideGames[command.game].label}攻略。`).finally(() => pending.delete(key));
       pending.set(key, operation);
     }

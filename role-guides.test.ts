@@ -64,6 +64,7 @@ olds: [{source: 西风驿站, collection_id: [4]}]
     git(gitRoot, "commit", "--quiet", "-m", "攻略来源");
 
     let failed = false;
+    let imageVersion = "1";
     const requested: string[] = [];
     const transport = (async (target: URL, init: RequestInit) => {
       expect(init.credentials).toBe("omit");
@@ -71,11 +72,11 @@ olds: [{source: 西风驿站, collection_id: [4]}]
       expect(new Headers(init.headers).has("cookie")).toBe(false);
       const url = new URL(target);
       const ids = url.searchParams;
-      if (failed) return new Response(null, { status: 503 });
       if (url.hostname === "bbs-api.mihoyo.com") {
         const id = ids.get("collection_id") ?? "";
         expect(ids.get("gids")).toBe("2");
         requested.push(id);
+        if (failed) return new Response(null, { status: 503 });
         const names: Record<string, string> = { "1": "钟离", "2": "流萤", "3": "艾莲" };
         const name = names[id];
         const posts = id === "341523" ? [{
@@ -88,7 +89,7 @@ olds: [{source: 西风驿站, collection_id: [4]}]
           post: { subject: `【一图流】${name}` },
           image_list: [
             { size: 10, url: "https://example.invalid/ignored.png" },
-            { size: 100, url: `https://upload-bbs.miyoushe.com/${id}.png` },
+            { size: 100, url: `https://upload-bbs.miyoushe.com/${id === "1" ? imageVersion : id}.png` },
           ],
         }] : [];
         return Response.json({ retcode: 0, data: { posts } });
@@ -124,8 +125,19 @@ olds: [{source: 西风驿站, collection_id: [4]}]
     expect(requested).not.toContain("4");
     expect(requested).not.toContain("6");
     expect(await readFile(join(cache, "作者/钟离.jpg"))).toEqual(image("1.png"));
+    imageVersion = "1-v2";
+    expect(await search("#岩王爷攻略")).toEqual(forwarded("钟离攻略~", "钟离本地覆盖", "1.png", "341523.png", "钟离旧缓存"));
+    expect(requested.filter((id) => id === "1")).toHaveLength(1);
+    const refresh = search("#更新岩王爷攻略");
+    expect(search("#更新钟离攻略")).toBe(refresh);
+    expect(search("#钟离攻略")).toBe(refresh);
+    expect(await refresh).toEqual(forwarded("钟离攻略~", "钟离本地覆盖", "1-v2.png", "341523.png", "钟离旧缓存"));
+    expect(requested.filter((id) => id === "1")).toHaveLength(2);
+    expect(await readFile(join(cache, "作者/钟离.jpg"))).toEqual(image("1-v2.png"));
     failed = true;
-    expect(await search("#更新钟离攻略")).toEqual(forwarded("钟离攻略~", "钟离本地覆盖", "1.png", "341523.png", "钟离旧缓存"));
+    expect(await search("#更新钟离攻略")).toEqual(forwarded("钟离攻略~", "钟离本地覆盖", "1-v2.png", "341523.png", "钟离旧缓存"));
+    expect(requested.filter((id) => id === "1")).toHaveLength(3);
+    expect(await readFile(join(cache, "作者/钟离.jpg"))).toEqual(image("1-v2.png"));
     expect(parseGuideCommand("#原神更新钟离一图流")).toEqual({ game: "gs", role: "钟离", update: true });
     expect(parseGuideCommand("#星铁更新流萤攻略")).toEqual({ game: "sr", role: "流萤", update: true });
     expect(parseGuideCommand("#绝区零更新艾莲攻略")).toEqual({ game: "zzz", role: "艾莲", update: true });

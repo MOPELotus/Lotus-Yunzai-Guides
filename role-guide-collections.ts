@@ -104,7 +104,8 @@ export function createRoleGuideCollections(options: {
   readonly signal?: AbortSignal;
 }) {
   const transport = options.fetch ?? fetch;
-  const reads = new Map<number, { time: number; posts: Promise<readonly Record<string, unknown>[]> }>();
+  type CollectionRead = { time: number; pending: boolean; posts: Promise<readonly Record<string, unknown>[]> };
+  const reads = new Map<number, CollectionRead>();
   function signal(milliseconds: number) {
     const timeout = AbortSignal.timeout(milliseconds);
     return options.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
@@ -119,32 +120,36 @@ export function createRoleGuideCollections(options: {
     });
     return response;
   }
-  function posts(id: number): Promise<readonly Record<string, unknown>[]> {
+  function posts(id: number, refresh: boolean): Promise<readonly Record<string, unknown>[]> {
     const existing = reads.get(id);
-    if (existing && Date.now() - existing.time < 120_000) return existing.posts;
+    if (existing && (existing.pending || (!refresh && Date.now() - existing.time < 120_000))) return existing.posts;
     const url = new URL(collectionUrl);
     url.search = new URLSearchParams({ gids: "2", order_type: "2", collection_id: String(id) }).toString();
     const requestPosts = (async () => {
       const result = object(JSON.parse((await responseBytes(await request(url, 30_000), 24 * 1024 * 1024)).toString("utf8")));
       if (result.retcode !== 0 || !Array.isArray(object(result.data).posts)) throw new Error("原攻略合集内容不可用。");
       return objects(object(result.data).posts);
-    })().catch(() => {
-      if (reads.get(id)?.posts === requestPosts) reads.delete(id);
-      return [];
-    });
-    reads.set(id, { time: Date.now(), posts: requestPosts });
+    })();
+    const reading: CollectionRead = {
+      time: Date.now(), pending: true,
+      posts: requestPosts.catch(() => {
+        if (reads.get(id) === reading) reads.delete(id);
+        return [];
+      }).finally(() => { reading.pending = false; }),
+    };
+    reads.set(id, reading);
     if (reads.size > 48) {
       const oldest = reads.keys().next().value;
       if (oldest !== undefined) reads.delete(oldest);
     }
-    return requestPosts;
+    return reading.posts;
   }
 
   return {
     authors: (game: GuideGame) => readAuthors(game, options.config),
-    async image(role: GuideRole, author: Author): Promise<Buffer | undefined> {
+    async image(role: GuideRole, author: Author, refresh = false): Promise<Buffer | undefined> {
       try {
-        const batches = await Promise.all(author.collection_id.map(posts));
+        const batches = await Promise.all(author.collection_id.map((id) => posts(id, refresh)));
         const url = selectImage(batches.flat(), role, author.collection_id.includes(341523));
         if (!url) return;
         const source = new URL(url);
