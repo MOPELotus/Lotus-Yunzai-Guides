@@ -9,6 +9,6 @@
   "dependencies": {
     "@lotus-yunzai/skia": "workspace:*",
     "node-schedule": "2.1.2",
-    "skia-canvas": "3.0.8"
+    "skia-canvas": "4.0.1"
   }
 }
