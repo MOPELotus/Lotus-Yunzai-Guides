@@ -9,7 +9,7 @@ import { genshinCalendarExtras, genshinCalendarMaterial, genshinCalendarPortrait
 
 const day = 86_400_000;
 const china = 8 * 3_600_000;
-const scale = 1.1;
+const scale = 4;
 const weekdays = "日一二三四五六";
 const fontName = "LotusCalendarText";
 const numberFont = "LotusCalendarNumbers";
