@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { Job } from "node-schedule";
 import type { CommandModule } from "../../lib/commands.ts";
 import type { MessageSegment } from "../../lib/messages.ts";
@@ -130,6 +130,7 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
     data("../mora-plugin/resources/mora-plugin-res/")];
   const original = createOriginalRoleResources({ root: data("../../data/guides/role-origin/"),
     cache, fallbacks: guidePack, signal: refreshSignal });
+  const legacyZzzResources = Bun.env.LOTUS_ZZZ_LEGACY_RESOURCES_DIR?.trim() || data("../ZZZ-Plugin/resources/");
   const guideOptions = {
     cache,
     config: Bun.env.LOTUS_GUIDES_ROLE_CONFIG_DIR?.trim() || data("../../config/guides/"),
@@ -139,6 +140,8 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
     guideAutomatic,
     legacyStrategies: [data("../../temp/strategy/"), data("../../data/strategy/")],
     legacyStrategySettings: data("../genshin/config/mys.set.yaml"),
+    legacyZzzResources,
+    legacyZzzRoot: dirname(legacyZzzResources),
     signal: refreshSignal, forward,
   };
   const roleGuides = createRoleGuides(guideOptions);

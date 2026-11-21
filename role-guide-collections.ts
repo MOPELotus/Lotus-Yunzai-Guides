@@ -65,6 +65,23 @@ async function responseBytes(response: Response, limit: number): Promise<Buffer>
 const collectionUrl = "https://bbs-api.mihoyo.com/post/wapi/getPostFullInCollection";
 const imageHosts = new Set(["upload-bbs.miyoushe.com", "upload-bbs.mihoyo.com"]);
 const legacyImageProcess = "image//resize,s_1200/quality,q_90/auto-orient,0/interlace,1/format,jpg";
+const zzzImageProcess = "image/resize,s_1200/quality,q_90/auto-orient,0/interlace,1/format,jpg";
+
+function selectZzzImage(posts: readonly Record<string, unknown>[], name: string): string | undefined {
+  const keyword = name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/gu, "");
+  if (!keyword) return;
+  for (const row of posts) {
+    const { subject } = object(row.post);
+    if (typeof subject !== "string" || !subject.replace(/【[^】]*本[^】]*】/gu, "").includes(keyword)) continue;
+    let largest: { url: string; size: number } | undefined;
+    for (const image of objects(row.image_list)) {
+      if (typeof image.url !== "string" || String(image.format).toLowerCase() === "gif") continue;
+      const size = Number(image.size) || 0;
+      if (!largest || size >= largest.size) largest = { url: image.url, size };
+    }
+    if (largest) return largest.url;
+  }
+}
 
 function selectImage(posts: readonly Record<string, unknown>[], role: GuideRole, structured: boolean): string | undefined {
   const name = guideKey(role.name);
@@ -106,7 +123,7 @@ export function createRoleGuideCollections(options: {
 }) {
   const transport = options.fetch ?? fetch;
   type CollectionRead = { time: number; pending: boolean; posts: Promise<readonly Record<string, unknown>[]> };
-  const reads = new Map<number, CollectionRead>();
+  const reads = new Map<string, CollectionRead>();
   function signal(milliseconds: number) {
     const timeout = AbortSignal.timeout(milliseconds);
     return options.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
@@ -121,11 +138,15 @@ export function createRoleGuideCollections(options: {
     });
     return response;
   }
-  function posts(id: number, refresh: boolean): Promise<readonly Record<string, unknown>[]> {
-    const existing = reads.get(id);
+  function posts(id: number, refresh: boolean, zzz: boolean): Promise<readonly Record<string, unknown>[]> {
+    const gid = zzz ? "8" : "2";
+    const key = `${gid}/${id}`;
+    const existing = reads.get(key);
     if (existing && (existing.pending || (!refresh && Date.now() - existing.time < 120_000))) return existing.posts;
     const url = new URL(collectionUrl);
-    url.search = new URLSearchParams({ gids: "2", order_type: "2", collection_id: String(id) }).toString();
+    url.searchParams.set("gids", gid);
+    if (!zzz) url.searchParams.set("order_type", "2");
+    url.searchParams.set("collection_id", String(id));
     const requestPosts = (async () => {
       const result = object(JSON.parse((await responseBytes(await request(url, 30_000), 24 * 1024 * 1024)).toString("utf8")));
       if (result.retcode !== 0 || !Array.isArray(object(result.data).posts)) throw new Error("原攻略合集内容不可用。");
@@ -134,11 +155,11 @@ export function createRoleGuideCollections(options: {
     const reading: CollectionRead = {
       time: Date.now(), pending: true,
       posts: requestPosts.catch(() => {
-        if (reads.get(id) === reading) reads.delete(id);
+        if (reads.get(key) === reading) reads.delete(key);
         return [];
       }).finally(() => { reading.pending = false; }),
     };
-    reads.set(id, reading);
+    reads.set(key, reading);
     if (reads.size > 48) {
       const oldest = reads.keys().next().value;
       if (oldest !== undefined) reads.delete(oldest);
@@ -148,14 +169,15 @@ export function createRoleGuideCollections(options: {
 
   return {
     authors: (game: GuideGame) => readAuthors(game, options.config),
-    async image(role: GuideRole, author: Author, refresh = false, numbered = false): Promise<Buffer | undefined> {
+    async image(role: GuideRole, author: Author, refresh = false, numbered?: "gs" | "zzz"): Promise<Buffer | undefined> {
       try {
-        const batches = await Promise.all(author.collection_id.map((id) => posts(id, refresh)));
-        const url = selectImage(batches.flat(), role, author.collection_id.includes(341523));
+        const zzz = numbered === "zzz";
+        const batches = await Promise.all(author.collection_id.map((id) => posts(id, refresh, zzz)));
+        const url = zzz ? selectZzzImage(batches.flat(), role.name) : selectImage(batches.flat(), role, author.collection_id.includes(341523));
         if (!url) return;
         const source = new URL(url);
         if (source.protocol !== "https:" || source.username || source.password || source.port || !imageHosts.has(source.hostname)) return;
-        if (numbered) source.searchParams.set("x-oss-process", legacyImageProcess);
+        if (numbered) source.searchParams.set("x-oss-process", zzz ? zzzImageProcess : legacyImageProcess);
         const bytes = await responseBytes(await request(source, 25_000), roleImageLimit);
         if (isGuideImage(bytes)) return bytes;
       } catch {}

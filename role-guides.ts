@@ -6,11 +6,14 @@ import { createRoleGuideCollections } from "./role-guide-collections.ts";
 import { createRoleResourcePack, type RolePackFallback, type RolePackSnapshot } from "./role-resource-pack.ts";
 import { guideGames, parseGuideCommand, resolveGuideRole, safeGuideName, type GuideGame, type GuideRole } from "./role-guide-input.ts";
 import { findGuidePack, readGuideImage, writeGuideFile, type GuideImage } from "./role-image-files.ts";
+import { createZzzStrategy } from "./zzz-strategy.ts";
 
 export function createRoleGuides(options: {
   readonly cache: string;
   readonly legacyStrategies?: readonly string[];
   readonly legacyStrategySettings?: string;
+  readonly legacyZzzResources?: string;
+  readonly legacyZzzRoot?: string;
   readonly atlas?: string;
   readonly config?: string;
   readonly guidePack?: RolePackFallback;
@@ -30,7 +33,7 @@ export function createRoleGuides(options: {
   const pending = new Map<string, Promise<CommandReply>>();
   const preference = createGenshinStrategyPreference(join(options.cache, "genshin-strategy.json"), options.legacyStrategySettings);
 
-  function operation(roleKey: string, update: boolean, load: () => Promise<CommandReply>, error: string) {
+  function operation<Reply extends CommandReply>(roleKey: string, update: boolean, load: () => Promise<Reply>, error: string) {
     const refreshKey = `${roleKey}/refresh`;
     const readKey = `${roleKey}/read`;
     const key = update ? refreshKey : readKey;
@@ -40,8 +43,11 @@ export function createRoleGuides(options: {
       result = Promise.resolve(inFlight).then(load).catch(() => error).finally(() => pending.delete(key));
       pending.set(key, result);
     }
-    return result;
+    return result as Promise<Reply | string>;
   }
+
+  const zzz = createZzzStrategy({ cache: options.cache, legacyRoot: options.legacyZzzRoot,
+    legacyResources: options.legacyZzzResources, collections, operation });
 
   async function legacyImage(source: number, filename: string) {
     for (const directory of options.legacyStrategies ?? []) {
@@ -59,7 +65,7 @@ export function createRoleGuides(options: {
       const local = join("numbered", String(source), filename);
       let bytes = await readGuideImage(options.cache, local) ?? await legacyImage(source, filename);
       if (!bytes || update) {
-        const downloaded = await collections.image(role, author, update, true);
+        const downloaded = await collections.image(role, author, update, "gs");
         if (downloaded) {
           await writeGuideFile(join(options.cache, local), downloaded).catch(() => {});
           bytes = downloaded;
@@ -123,7 +129,8 @@ export function createRoleGuides(options: {
     }
     const result = [...reply.values()];
     if (!result.length) {
-      if (useDefault) return numberedLookup(role, await preference.get(), update);
+      if (useDefault && game === "gs") return numberedLookup(role, await preference.get(), update);
+      if (useDefault && game === "zzz") return zzz.lookup(role.name, update);
       return `暂无${role.name}的${gamePath.label}攻略。`;
     }
     if (result.length === 1) return result[0]!;
@@ -133,6 +140,8 @@ export function createRoleGuides(options: {
 
   return (message: string, isMaster = false): CommandReply | Promise<CommandReply> | undefined => {
     const input = message.trim();
+    const zzzCommand = zzz.command(input, isMaster);
+    if (zzzCommand !== undefined) return zzzCommand;
     if (/^#?(?:原神)?攻略(?:帮助|说明)?$/u.test(input)) return genshinStrategyHelp;
     const setting = /^#?(?:原神)?设置默认攻略([1-7])?$/u.exec(input);
     if (setting) {
@@ -151,7 +160,7 @@ export function createRoleGuides(options: {
     }
     if (!safeGuideName(role.name)) return;
     if (command.source) return numberedLookup(role, command.source, command.update);
-    const useDefault = command.game === "gs" && input.endsWith("攻略");
+    const useDefault = command.game !== "sr" && input.endsWith("攻略");
     return operation(`${command.game}/${role.name}/${useDefault ? "strategy" : "guide"}`, command.update,
       () => lookup(command.game, role, command.update, useDefault),
       `暂时无法取得${role.name}的${guideGames[command.game].label}攻略。`);
