@@ -16,6 +16,12 @@ export function genshinStrategySource(number: number) {
   return sources[number - 1];
 }
 
+export function genshinStrategyNumber(author: { readonly source: string; readonly collection_id: readonly number[] }) {
+  const index = sources.findIndex(({ source, collection_id }) => source === author.source &&
+    collection_id.length === author.collection_id.length && collection_id.every((id, offset) => id === author.collection_id[offset]));
+  if (index >= 0) return index + 1;
+}
+
 export const genshinStrategyHelp = [
   "原神编号攻略",
   "发送 #心海攻略4 指定来源，或用 #更新早柚攻略4 刷新该来源。",

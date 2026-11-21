@@ -83,6 +83,21 @@ test("原神编号攻略读取原作者和旧缓存，默认入口保留普通�
     expect(parseGuideCommand("#绝区零艾莲攻略4")).toBeUndefined();
     expect(parseGuideCommand("#心海一图流4")).toBeUndefined();
     expect(parseGuideCommand("#心海攻略8")).toBeUndefined();
+
+    await put(join(legacy, "1/珊瑚宫心海.jpg"), image("source-1-other-collection"));
+    await put(join(legacy, "2/珊瑚宫心海.jpg"), image("source-2-other-author"));
+    await put(join(root, "config/roleGuides.yaml"), `news: []
+olds:
+- {source: 西风驿站, collection_id: [839176]}
+- {source: 其他作者, collection_id: [813033]}
+`);
+    unavailable = false;
+    requests.length = 0;
+    search = build();
+    expect(await search("#心海一图流")).toBe("暂无珊瑚宫心海的原神攻略。");
+    expect(requests).toEqual([839176, 813033]);
+    expect(await search("#心海攻略1")).toEqual(reply("source-1-other-collection"));
+    expect(await search("#心海攻略")).toEqual(reply("/kokomi-4.png"));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

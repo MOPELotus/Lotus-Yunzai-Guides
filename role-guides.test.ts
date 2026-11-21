@@ -43,11 +43,11 @@ test("三游戏保留旧攻略命令、配置源、本地覆盖及旧 Atlas，�
     await put("atlas/star-rail-atlas/guide for role/1310.png", image("流萤旧 Atlas"));
     await put("atlas/zzz-atlas/角色攻略/艾莲.png", image("艾莲旧 Atlas"));
     await put("roleGuides/add_ons/Asgater/钟离.jpg", image("钟离本地覆盖"));
-    await put("oldStrategy/1/钟离.jpg", image("钟离旧缓存"));
+    await put("oldStrategy/2/钟离.jpg", image("钟离旧缓存"));
     await put("config/roleGuides.yaml", `news:
 - {source: 作者, collection_id: ["1"]}
 - {source: OH是姜姜呀, collection_id: [341523]}
-olds: [{source: 西风驿站, collection_id: [4]}]
+olds: [{source: 原神观测枢, collection_id: [813033]}]
 `);
     await put("config/srRoleGuides.yaml", `- {source: 听语惊花, collection_id: [5]}
 - {source: 星穹中心, collection_id: [2]}
@@ -122,7 +122,7 @@ olds: [{source: 西风驿站, collection_id: [4]}]
     expect(await reference("#星铁罗刹参考面板")).toEqual([part("罗刹参考面板"), "https://www.miyoushe.com/sr/article/456"]);
     expect(await reference("#收益曲线帮助")).toEqual(expect.arrayContaining([part("收益曲线帮助")]));
     expect(await reference("#星铁参考面板帮助")).toEqual(expect.arrayContaining([part("星铁参考面板帮助")]));
-    expect(requested).not.toContain("4");
+    expect(requested).not.toContain("813033");
     expect(requested).not.toContain("6");
     expect(await readFile(join(cache, "作者/钟离.jpg"))).toEqual(image("1.png"));
     imageVersion = "1-v2";

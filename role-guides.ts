@@ -1,7 +1,7 @@
 // Source precedence and legacy cache layout are from Mora-Plugin model/roleGuide.js.
 import { join } from "node:path";
 import type { CommandReply } from "../../lib/commands.ts";
-import { createGenshinStrategyPreference, genshinStrategyHelp, genshinStrategySource } from "./genshin-strategy.ts";
+import { createGenshinStrategyPreference, genshinStrategyHelp, genshinStrategyNumber, genshinStrategySource } from "./genshin-strategy.ts";
 import { createRoleGuideCollections } from "./role-guide-collections.ts";
 import { createRoleResourcePack, type RolePackFallback, type RolePackSnapshot } from "./role-resource-pack.ts";
 import { guideGames, parseGuideCommand, resolveGuideRole, safeGuideName, type GuideGame, type GuideRole } from "./role-guide-input.ts";
@@ -95,17 +95,17 @@ export function createRoleGuides(options: {
     const images: GuideImage[] = assets.map((image) => overrideMap.get(image.source) ?? image);
     if (atlas && !packedNames.has(atlas.source)) images.push(overrideMap.get(atlas.source) ?? atlas);
 
-    const fromCollections = await Promise.all([...configured.news, ...configured.olds].map(async (author, index) => {
+    const fromCollections = await Promise.all([...configured.news, ...configured.olds].map(async (author) => {
       const override = overrideMap.get(author.source);
       if (override) return override;
       // A bundled guide wins for its publisher. Legacy Atlas replaces the matching collection.
       if (packedNames.has(author.source) || atlas?.source === author.source) return;
       const filename = role.name + ".jpg";
       const local = join(author.source, suffix, filename);
-      const legacyIndex = index - configured.news.length + 1;
       let saved = await readGuideImage(options.cache, local);
-      if (!saved && game === "gs" && legacyIndex > 0) {
-        saved = await legacyImage(legacyIndex, filename);
+      if (!saved && game === "gs") {
+        const number = genshinStrategyNumber(author);
+        if (number !== undefined) saved = await legacyImage(number, filename);
       }
       if (saved && !update) return { source: author.source, bytes: saved };
       const bytes = await collections.image(role, author, update);
