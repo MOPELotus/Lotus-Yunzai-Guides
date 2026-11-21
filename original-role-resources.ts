@@ -7,7 +7,7 @@ import { bannerFiles } from "./banner-tables.ts";
 import { guideGames, safeGuideName } from "./role-guide-input.ts";
 import { isGuideImage, roleImageLimit, writeGuideFile } from "./role-image-files.ts";
 import { cleanGuideStages, fetchGuideBlobs, guideBlobId, guideSource, guideSourceRef,
-  prepareGuideSourceGit, readLocalGuideBlob } from "./team-resources.ts";
+  prepareGuideSourceGit, readLocalGuideBlob, verifyGuideSnapshot } from "./team-resources.ts";
 
 const rolePaths = ["Genshin/Roles/Guides", "Genshin/Roles/RefStat", "Genshin/Roles/YieldCurve",
   "StarRail/Roles/Guides", "StarRail/Roles/RefStat", "ZenlessZoneZero/Roles/Guides"] as const;
@@ -120,8 +120,8 @@ export function createOriginalRoleResources({ root, cache, fallbacks, signal, so
       const resources = sourceResources(await git(["ls-tree", "-r", "-z", guideSourceRef, "--", ...paths]), scope);
       const tree = createHash("sha1").update(JSON.stringify(resources)).digest("hex");
       const previous = await current();
-      if (previous?.tree === tree && (scope === "roles" || (await Promise.all(resources.map(item =>
-        readLocalGuideBlob(previous.directory, item.path, item.hash, limit(item))))).every(Boolean))) {
+      if (previous?.tree === tree && await verifyGuideSnapshot(previous.directory,
+        resources.map(item => ({ path: item.path, hash: item.hash, maxBytes: limit(item) })), attempt)) {
         await writeGuideFile(checked, "");
         await rm(pending, { force: true });
         return "current";

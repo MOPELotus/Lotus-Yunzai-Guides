@@ -66,6 +66,22 @@ export async function readLocalGuideBlob(directory: string, file: string, hash: 
   } catch {}
 }
 
+export async function verifyGuideSnapshot(directory: string, files: readonly {
+  readonly path: string;
+  readonly hash: string;
+  readonly maxBytes: number;
+}[], signal: AbortSignal) {
+  for (let start = 0; start < files.length; start += 8) {
+    signal.throwIfAborted();
+    const batch = files.slice(start, start + 8);
+    const valid = await Promise.all(batch.map(({ path, hash, maxBytes }) =>
+      readLocalGuideBlob(directory, path, hash, maxBytes).then(Boolean)));
+    signal.throwIfAborted();
+    if (valid.some(result => !result)) return false;
+  }
+  return true;
+}
+
 export async function cleanGuideStages(root: string, prefix: ".refresh-" | ".install-") {
   for (const entry of await readdir(root, { withFileTypes: true })) {
     if (entry.isDirectory() && entry.name.startsWith(prefix) && /^[a-z0-9]{6}$/iu.test(entry.name.slice(prefix.length))) {
@@ -182,13 +198,14 @@ export function createTeamResources(options: {
       const tree = (await git(["rev-parse", "--verify", `${guideSourceRef}:${sourcePath}`])).toString().trim();
       if (!gitId.test(tree)) throw new Error("上游配队目录无效。");
       const previous = await managedSnapshot(root);
-      if (!force && previous?.tree === tree) {
+      const objects = readGitTree((await git(["ls-tree", "-r", "-z", guideSourceRef, "--", sourcePath])).toString("utf8"));
+      if (!force && previous?.tree === tree && await verifyGuideSnapshot(previous.directory,
+        [...objects].map(([path, hash]) => ({ path, hash, maxBytes: path === indexPath ? maxIndex : maxImage })), signal)) {
         await writeGuideFile(checked, "");
         await rm(pending, { force: true });
         return "current";
       }
 
-      const objects = readGitTree((await git(["ls-tree", "-r", "-z", guideSourceRef, "--", sourcePath])).toString("utf8"));
       const known = new Map<string, Buffer>();
       let total = 0;
       function retain(hash: string, bytes: Buffer) {

@@ -49,12 +49,18 @@ test("分批从源 Git 读取配队文件，完整后切换，损坏与断网保
     const pending = resources.refresh();
     expect(resources.refresh()).toBe(pending);
     expect(await pending).toBe("updated");
-    const initial = await resources.directory();
+    let initial = await resources.directory();
     expect(await readdir(initial)).toEqual(expect.arrayContaining(["teamGuides.yaml", "茗血茶"]));
     expect(await readFile(join(initial, "茗血茶", "万达国际.png"))).toEqual(PNG);
     expect(await Bun.file(join(initial, "ignored.js")).exists()).toBe(false);
     expect(await resources.refresh()).toBe("current");
     expect(await resources.directory()).toBe(initial);
+
+    await rm(join(initial, "茗血茶", "万达国际.png"));
+    expect(await resources.refresh()).toBe("updated");
+    initial = await resources.directory();
+    expect(await readFile(join(initial, "茗血茶", "万达国际.png"))).toEqual(PNG);
+    expect(await resources.refresh()).toBe("current");
 
     await writeFile(image, "损坏图片");
     commit("损坏发布");

@@ -96,6 +96,18 @@ exec '${git}' "$@"
     expect(await readFile(join((await resumed.current())!.directory, supported[0]!))).toEqual(updated);
     expect(await readFile(join(installed, supported[0]!))).toEqual(image(supported[0]!));
     expect(await resumed.refresh()).toBe("current");
+    const current = (await resumed.current())!.directory;
+    const missing = supported[2]!;
+    const corrupted = supported[3]!;
+    const beforeRepair = await readFile(trace, "utf8");
+    await rm(join(current, missing));
+    await writeFile(join(current, corrupted), image("原作者图像的头部相同但哈希已变"));
+    expect(await resumed.refresh()).toBe("updated");
+    const repaired = (await resumed.current())!.directory;
+    expect(await readFile(join(repaired, missing))).toEqual(image(missing));
+    expect(await readFile(join(repaired, corrupted))).toEqual(image(corrupted));
+    expect((await readFile(trace, "utf8")).slice(beforeRepair.length).trim()).toBe(guideBlobId(image(corrupted)));
+    expect(await resumed.refresh()).toBe("current");
   } finally {
     controller.abort();
     if (savedPath === undefined) delete Bun.env.PATH;
