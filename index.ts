@@ -8,6 +8,7 @@ import { createTeamResources } from "./team-resources.ts";
 import { createRoleGuides } from "./role-guides.ts";
 import { createRoleReferences } from "./role-references.ts";
 import { createOriginalRoleResources } from "./original-role-resources.ts";
+import { createBannerTables } from "./banner-tables.ts";
 import { createGenshinCalendar, createStarrailCalendar, createZzzCalendar } from "./calendar.ts";
 import { createCalendarSchedule, type CalendarSchedule, type CalendarScheduleOptions } from "./calendar-schedule.ts";
 
@@ -22,6 +23,7 @@ export function createGuidesModule(options: {
   readonly starrailCalendar?: ReturnType<typeof createStarrailCalendar>;
   readonly genshinCalendar?: ReturnType<typeof createGenshinCalendar>;
   readonly zzzCalendar?: ReturnType<typeof createZzzCalendar>;
+  readonly bannerTables?: ReturnType<typeof createBannerTables>;
 }): CommandModule {
   const { resources } = options;
   const refresh = (force: boolean) => async (argument: string, { isMaster }: { isMaster: boolean }) => {
@@ -45,6 +47,8 @@ export function createGuidesModule(options: {
       const command = normalizedMessage || message;
       const calendar = options.genshinCalendar?.(command) ?? options.starrailCalendar?.(command) ?? options.zzzCalendar?.(command);
       if (calendar !== undefined) return calendar;
+      const banners = options.bannerTables?.(command);
+      if (banners !== undefined) return banners;
       const roleGuide = options.roleReferences?.(command) ?? options.roleGuides?.(command, isMaster);
       if (roleGuide !== undefined) return roleGuide;
       if (/^#(?:星铁|绝区零)/u.test(command)) return;
@@ -130,6 +134,9 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
     data("../mora-plugin/resources/mora-plugin-res/")];
   const original = createOriginalRoleResources({ root: data("../../data/guides/role-origin/"),
     cache, fallbacks: guidePack, signal: refreshSignal });
+  const bannerResources = createOriginalRoleResources({ root: data("../../data/guides/banner-origin/"),
+    cache, fallbacks: guidePack, signal: refreshSignal, banners: true });
+  const bannerTables = createBannerTables(bannerResources, guidePack, forward);
   const legacyZzzResources = Bun.env.LOTUS_ZZZ_LEGACY_RESOURCES_DIR?.trim() || data("../ZZZ-Plugin/resources/");
   const guideOptions = {
     cache,
@@ -170,19 +177,24 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
   const unregister = scheduled && !refreshSignal.aborted ? guidesSchedule?.register(scheduled) : undefined;
   let stop: ReturnType<typeof startTeamResourceRefresh> | undefined;
   let stopOriginal: ReturnType<typeof startResourceRefresh> | undefined;
+  let stopBanners: ReturnType<typeof startResourceRefresh> | undefined;
   const cancelStart = guideAutomatic && guidesSchedule?.whenReady(() => {
     if (refreshSignal.aborted) return;
     if (resources) stop = startTeamResourceRefresh(resources, refreshSignal);
     stopOriginal = startResourceRefresh(original, refreshSignal, "role", "角色和进阶攻略资源");
+    stopBanners = startResourceRefresh(bannerResources, refreshSignal, "banners", "复刻表资源");
   });
   return {
-    ...createGuidesModule({ directory: directory ?? legacyDirectory, forward, resources, roleGuides, roleReferences, starrailCalendar, genshinCalendar, zzzCalendar }),
+    ...createGuidesModule({ directory: directory ?? legacyDirectory, forward, resources, roleGuides, roleReferences,
+      starrailCalendar, genshinCalendar, zzzCalendar, bannerTables }),
     async dispose() {
       controller.abort();
       if (cancelStart) cancelStart();
       unregister?.();
       await scheduled?.stop();
       await stopOriginal?.();
+      if (stopBanners) await stopBanners();
+      else await bannerResources.wait();
       if (stop) await stop();
       else await resources?.wait();
     },
