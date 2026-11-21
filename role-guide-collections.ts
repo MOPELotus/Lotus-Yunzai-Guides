@@ -64,6 +64,7 @@ async function responseBytes(response: Response, limit: number): Promise<Buffer>
 
 const collectionUrl = "https://bbs-api.mihoyo.com/post/wapi/getPostFullInCollection";
 const imageHosts = new Set(["upload-bbs.miyoushe.com", "upload-bbs.mihoyo.com"]);
+const legacyImageProcess = "image//resize,s_1200/quality,q_90/auto-orient,0/interlace,1/format,jpg";
 
 function selectImage(posts: readonly Record<string, unknown>[], role: GuideRole, structured: boolean): string | undefined {
   const name = guideKey(role.name);
@@ -147,13 +148,14 @@ export function createRoleGuideCollections(options: {
 
   return {
     authors: (game: GuideGame) => readAuthors(game, options.config),
-    async image(role: GuideRole, author: Author, refresh = false): Promise<Buffer | undefined> {
+    async image(role: GuideRole, author: Author, refresh = false, numbered = false): Promise<Buffer | undefined> {
       try {
         const batches = await Promise.all(author.collection_id.map((id) => posts(id, refresh)));
         const url = selectImage(batches.flat(), role, author.collection_id.includes(341523));
         if (!url) return;
         const source = new URL(url);
         if (source.protocol !== "https:" || source.username || source.password || source.port || !imageHosts.has(source.hostname)) return;
+        if (numbered) source.searchParams.set("x-oss-process", legacyImageProcess);
         const bytes = await responseBytes(await request(source, 25_000), roleImageLimit);
         if (isGuideImage(bytes)) return bytes;
       } catch {}

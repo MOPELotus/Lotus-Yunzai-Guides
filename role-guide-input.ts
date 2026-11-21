@@ -83,9 +83,15 @@ export function resolveGuideRole(query: string, game: GuideGame): GuideRole | st
   return { name: input };
 }
 
-export function parseGuideCommand(command: string) {
+export function parseGuideCommand(command: string): { readonly game: GuideGame; readonly role: string;
+  readonly update: boolean; readonly source?: number } | undefined {
+  const input = command.trim();
+  const numbered = /^#?(?:原神)?(更新)?(\S+?)攻略([1-7])$/u.exec(input);
+  if (numbered && !/^(?:星铁|绝区零)/u.test(numbered[2]!)) {
+    return { game: "gs", role: numbered[2]!, update: !!numbered[1], source: Number(numbered[3]) };
+  }
   if (/(?:进阶攻略|图鉴攻略)$/u.test(command)) return;
-  const match = /^#?(?:(星铁|绝区零|原神))?(更新)?(\S+?)(?:攻略|一图流)$/u.exec(command.trim());
+  const match = /^#?(?:(星铁|绝区零|原神))?(更新)?(\S+?)(?:攻略|一图流)$/u.exec(input);
   if (!match || !match[3]) return;
   const game = match[1] === "星铁" ? "sr" : match[1] === "绝区零" ? "zzz" : "gs";
   return { game, role: match[3], update: !!match[2] } as const;

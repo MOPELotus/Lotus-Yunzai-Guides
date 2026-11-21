@@ -41,11 +41,11 @@ export function createGuidesModule(options: {
       "#更新配队资源": refresh(false),
       "#强制更新配队资源": refresh(true),
     },
-    async fallback(message, { normalizedMessage }) {
+    async fallback(message, { normalizedMessage, isMaster }) {
       const command = normalizedMessage || message;
       const calendar = options.genshinCalendar?.(command) ?? options.starrailCalendar?.(command) ?? options.zzzCalendar?.(command);
       if (calendar !== undefined) return calendar;
-      const roleGuide = options.roleReferences?.(command) ?? options.roleGuides?.(command);
+      const roleGuide = options.roleReferences?.(command) ?? options.roleGuides?.(command, isMaster);
       if (roleGuide !== undefined) return roleGuide;
       if (/^#(?:星铁|绝区零)/u.test(command)) return;
       const query = /^#(\S+)配队$/u.exec(command)?.[1];
@@ -138,6 +138,7 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
     guideSnapshot: original.current,
     guideAutomatic,
     legacyStrategies: [data("../../temp/strategy/"), data("../../data/strategy/")],
+    legacyStrategySettings: data("../genshin/config/mys.set.yaml"),
     signal: refreshSignal, forward,
   };
   const roleGuides = createRoleGuides(guideOptions);

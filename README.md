@@ -4,6 +4,8 @@
 
 `#钟离攻略`、`*流萤攻略` 和 `%艾莲一图流` 分别查询原神、星铁和绝区零的角色攻略。也可以用角色别名或 `#星铁`、`#绝区零` 前缀。用 `#更新钟离攻略`、`*更新流萤攻略` 或 `%更新艾莲一图流` 重新检查原资源仓和作者合集，无需等合集列表的两分钟缓存过期。更新失败时会尝试使用本机已有原图。
 
+原神可用 `#心海攻略4` 指定原作者编号，或用 `#更新早柚攻略4` 刷新该作者的图。`#攻略帮助` 列出七个来源。普通 `#角色攻略` 优先发送现有综合攻略，只有综合来源无图才查默认编号。可读旧 `plugins/genshin/config/mys.set.yaml` 的 `defaultSource`，未设置时使用编号 1。主人可用 `#设置默认攻略1` 至 `#设置默认攻略7` 修改。设置保存至所用角色缓存目录的 `genshin-strategy.json`，编号原图缓存在其 `numbered/` 子目录。
+
 宿主就绪后在后台从原 Gitee 资源仓准备三款游戏的角色攻略和进阶参考。每天北京时间 03:00 至 04:00 检查更新，已有文件按 Git 内容哈希复用，只下载缺少或变化的原图。断线后保留已下载的文件及正在使用的版本，恢复后继续下载。准备期间也可查询，已有原图直接发送，缺少的角色可按需从原源读取。米游社攻略沿用原作者合集，按角色读取及刷新。
 
 自动同步的角色和进阶原图保存在 `data/guides/role-origin/`。按角色缓存和自定义图默认放在 `data/guides/roleGuides/`，可用 `LOTUS_GUIDES_ROLE_DIR` 改路径。自定义图放在 `add_ons/<作者>/<角色>.<扩展名>`，星铁和绝区零在作者目录下分别多一层 `StarRail/` 和 `ZenlessZoneZero/`。同一作者的自定义图优先。
@@ -36,4 +38,5 @@
 - 角色别名保留原 Miao `resources/meta-gs/character/alias.js`，角色 ID 与名称取自同目录的 `data.json`。版本为 `2860761836069af80bacee5cb85b6dd2e91ea0b0`。保留 [MIT 许可](LICENSE-MIAO)。[Miao 源码](https://github.com/MOPELotus/miao-plugin/tree/2860761836069af80bacee5cb85b6dd2e91ea0b0)
 - 配队索引与原图通过运行时 Git 从 Mora 资源库的 `master` 分支读取。初次迁移对照提交为 `85231a2a1dc2ea0c1c67568a97ac3e144e734b72`。作者为茗血茶和卡玛sei亚。[配队图来源](https://www.miyoushe.com/ys/collection/1070358)、[阵容图来源](https://www.miyoushe.com/ys/collection/491538)、[Mora 资源库](https://gitee.com/Rrrrrrray/mora-plugin-res)
 - 角色攻略沿用 Rrrrrrray 的 Mora-Plugin 同一版本的 `apps/roleGuides.js`、`model/roleGuide.js` 与三个默认攻略配置，按原作者从 Mora 资源库和米游社合集读取图片。星铁角色别名及 ID/名称来自 Miao 同一提交里的 `resources/meta-sr/character/`。[Mora-Plugin](https://gitee.com/Rrrrrrray/mora-plugin)、[Mora 资源库](https://gitee.com/Rrrrrrray/mora-plugin-res)
+- 原神攻略编号和原作者合集对应旧 TRSS Genshin 的 `apps/strategy.js`。按原链接从米游社公开合集取图。[旧源码](https://github.com/TimeRainStarSky/Yunzai-genshin/blob/0290a17cd42c52671e3130fe4a0a5aa38a64faa4/apps/strategy.js)
 - 三款游戏的活动日历依据同一 Miao 提交里的 `apps/wiki/Calendar.js`、`CalendarSr.js`、`CalendarZZZ.js` 及 `resources/wiki/calendar.html`、`calendar.css`。原神材料轮换沿用 `resources/meta-gs/material/daily.js`。[喵喵日历源文件](https://github.com/MOPELotus/miao-plugin/tree/2860761836069af80bacee5cb85b6dd2e91ea0b0/apps/wiki)
