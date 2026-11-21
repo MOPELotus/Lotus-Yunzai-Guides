@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { link, lstat, mkdir, mkdtemp, readlink, readdir, rename, rm, symlink, utimes } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { lockFile } from "../../lib/file-lock.ts";
-import { abyssReferencePaths, isAbyssReferencePath, requiredAbyssReferences } from "./abyss-references.ts";
+import { abyssReferencePaths, abyssVersionDirectory, isAbyssReferencePath, originalAbyssVersion, requiredAbyssReferences } from "./abyss-references.ts";
 import { bannerFiles } from "./banner-tables.ts";
 import { guideGames, safeGuideName } from "./role-guide-input.ts";
 import { isGuideImage, roleImageLimit, writeGuideFile } from "./role-image-files.ts";
@@ -15,7 +15,6 @@ const sourcePaths = { roles: rolePaths, banners: ["Banners"], abyss: abyssRefere
 type Scope = keyof typeof sourcePaths;
 const hashPattern = /^[0-9a-f]{40}$/u;
 const snapshotPattern = /^snapshots\/([0-9a-f]{40})-[0-9a-f-]{36}$/u;
-const batchSize = 8;
 const notesLimit = 128 * 1024;
 const freshness = 24 * 60 * 60 * 1000;
 
@@ -33,7 +32,7 @@ function sourceResources(output: Uint8Array, scope: Scope) {
     const base = sourcePaths[scope].find((candidate) => path.startsWith(candidate + "/"));
     if (!base) continue;
     const parts = path.slice(base.length + 1).split("/");
-    if (parts.some((part) => !safeGuideName(part)) || parts.length !== (base.endsWith("/Guides") ? 2 : 1)) continue;
+    if (parts.some((part) => !safeGuideName(part)) || parts.length !== (base.endsWith("/Guides") || base === abyssVersionDirectory ? 2 : 1)) continue;
     const file = parts.at(-1)!;
     if (scope === "banners" && !bannerFiles.some(name => name === file)) continue;
     if (scope === "abyss" && !isAbyssReferencePath(path)) continue;
@@ -89,6 +88,7 @@ export function createOriginalRoleResources({ root, cache, fallbacks, signal, so
   readonly scope?: Scope;
 }) {
   const paths = sourcePaths[scope];
+  const batchSize = scope === "abyss" ? 32 : 8;
   const objects = join(root, "objects");
   const pending = join(root, "pending");
   const checked = join(root, "checked");
@@ -182,7 +182,9 @@ export function createOriginalRoleResources({ root, cache, fallbacks, signal, so
   return {
     current,
     async initialized() {
-      if (await Bun.file(pending).exists() || !(await current())) return false;
+      const currentSnapshot = await current();
+      if (await Bun.file(pending).exists() || !currentSnapshot ||
+          scope === "abyss" && !(await lstat(join(currentSnapshot.directory, originalAbyssVersion)).catch(() => undefined))?.isFile()) return false;
       const stamp = await lstat(checked).catch(() => undefined);
       return stamp !== undefined && Date.now() - stamp.mtimeMs < freshness;
     },
