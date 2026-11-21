@@ -2,6 +2,10 @@ import { expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { normalizeGameCommand } from "../../lib/command-prefix.ts";
+import { CommandRegistry } from "../../lib/commands.ts";
+import type { MessageEvent } from "../../lib/messages.ts";
+import { createGuidesModule } from "./index.ts";
 import { createRoleGuides } from "./role-guides.ts";
 
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X9uoAAAAASUVORK5CYII=", "base64");
@@ -59,6 +63,15 @@ test("绝区零编号使用原站与准确作者缓存，全部保留原顺序�
     const build = () => createRoleGuides({ cache, config: join(root, "config"), legacyZzzRoot: legacy,
       legacyZzzResources: join(legacy, "resources"), guideAutomatic: false, fetch: transport });
     let search = build();
+    const registry = new CommandRegistry();
+    registry.registerModule(createGuidesModule({ directory: root, roleGuides: (input, master) => search(input, master) }));
+    function dispatch(msg: string) {
+      const event: MessageEvent = {
+        post_type: "message", message_type: "group", self_id: 10, group_id: 20, user_id: 30,
+        isGroup: true, isPrivate: false, isMaster: false, msg, raw_message: msg, message: msg, reply: () => true,
+      };
+      return registry.dispatchFallback(event, () => true, () => false, normalizeGameCommand(event).msg);
+    }
     expect(await search("％攻略帮助")).toContain("7. HoYo青枫");
     expect(await search("%鲨鱼妹攻略1")).toEqual(reply("old-source1"));
     expect(calls).toEqual([]);
@@ -70,6 +83,7 @@ test("绝区零编号使用原站与准确作者缓存，全部保留原顺序�
     const all = { type: "forward" as const, nodes: [reply("old-source1"), reply("/source2-1.png"), "暂无艾莲攻略（小橙子阿）。"] };
     expect(await search("%艾莲攻略all")).toEqual(all);
     expect(await search("%艾莲攻略0")).toEqual(all);
+    expect(await dispatch("%艾莲攻略")).toEqual(all);
     expect(await search("#绝区零艾莲攻略")).toEqual(all);
     expect(await search("#绝区零妮可攻略")).toEqual(reply("plain-mora"));
     expect(await search("%设置所有攻略显示个数1")).toContain("只有主人");
@@ -80,6 +94,7 @@ test("绝区零编号使用原站与准确作者缓存，全部保留原顺序�
     expect(JSON.parse(await readFile(join(cache, "zzz-strategy.json"), "utf8"))).toEqual({ default_guide: 2, max_forward_guides: 1 });
     expect(await readFile(legacyConfig, "utf8")).toBe(configuration);
     search = build();
+    expect(await dispatch("％艾莲攻略")).toEqual(reply("/source2-1.png"));
     expect(await search("#绝区零艾莲攻略")).toEqual(reply("/source2-1.png"));
     expect(await search("%艾莲攻略all")).toEqual({ type: "forward", nodes: [reply("old-source1")] });
     revision = 2;
