@@ -12,31 +12,39 @@ export function createBannerTables(resources: Pick<OriginalRoleResources, "curre
 
   async function lookup(files: readonly string[]): Promise<CommandReply> {
     const title = "复刻时间表";
-    async function images(directory: string) {
+    async function read(directory: string) {
       const list = await Promise.all(files.map(file => readGuideImage(directory, join("Banners", file))));
-      return list.filter(bytes => bytes !== undefined).map(file => ({ type: "image" as const, file }));
+      return {
+        images: list.filter(bytes => bytes !== undefined).map(file => ({ type: "image" as const, file })),
+        missing: files.filter((_, index) => list[index] === undefined),
+      };
     }
 
     const current = await resources.current();
     const directories = current ? [current.directory, ...fallbacks] : fallbacks;
-    let available: Awaited<ReturnType<typeof images>> = [];
+    let available: Awaited<ReturnType<typeof read>> = { images: [], missing: [...files] };
     for (const directory of directories) {
-      const list = await images(directory);
-      if (list.length > available.length) available = list;
-      if (available.length === files.length) break;
+      const candidate = await read(directory);
+      if (candidate.missing.length < available.missing.length) available = candidate;
+      if (!available.missing.length) break;
     }
-    if (!available.length && Date.now() >= retryAt) {
+    if (available.missing.length && Date.now() >= retryAt) {
       try {
         await resources.refresh();
         const snapshot = await resources.current();
-        if (snapshot) available = await images(snapshot.directory);
-      } catch {
-        retryAt = Date.now() + 120_000;
-      }
+        if (snapshot) {
+          const candidate = await read(snapshot.directory);
+          if (candidate.missing.length < available.missing.length) available = candidate;
+        }
+      } catch {}
+      if (available.missing.length) retryAt = Date.now() + 120_000;
     }
-    if (!available.length) return "原复刻表暂不可用，请稍后再试。";
-    if (available.length === 1) return available[0]!;
-    return forward ? { type: "forward", nodes: [title, ...available] } : [title, ...available];
+    const { images, missing } = available;
+    if (!images.length) return "原复刻表暂不可用，请稍后再试。";
+    const notice = missing.length && `原复刻表暂缺${missing.map(file => file.replace(/\.png$/u, "")).join("、")}。`;
+    if (images.length === 1) return notice ? [notice, images[0]!] : images[0]!;
+    const nodes = [title, ...(notice ? [notice] : []), ...images];
+    return forward ? { type: "forward", nodes } : nodes;
   }
 
   return (message: string) => {

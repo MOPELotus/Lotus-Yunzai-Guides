@@ -113,7 +113,9 @@ export function createOriginalRoleResources({ root, cache, fallbacks, signal, so
       const git = await prepareGuideSourceGit(temporary, source, attempt);
       const resources = sourceResources(await git(["ls-tree", "-r", "-z", guideSourceRef, "--", ...paths]), paths, banners);
       const tree = createHash("sha1").update(JSON.stringify(resources)).digest("hex");
-      if ((await current())?.tree === tree) {
+      const previous = await current();
+      if (previous?.tree === tree && (!banners || (await Promise.all(resources.map(item =>
+        readLocalGuideBlob(previous.directory, item.path, item.hash, limit(item))))).every(Boolean))) {
         await writeGuideFile(checked, "");
         await rm(pending, { force: true });
         return "current";

@@ -45,6 +45,14 @@ test.skipIf(!Bun.which("git"))("复刻表保留旧游戏过滤、节点顺序和
     const fallback = createBannerTables(resources, [legacy], true);
     expect(await fallback("#复刻表")).toEqual(forward(...bannerFiles));
     expect(await resources.current()).toBeUndefined();
+    const partial = join(root, "partial");
+    const otherPartial = join(root, "other-partial");
+    await mkdir(join(partial, "Banners"), { recursive: true });
+    await mkdir(join(otherPartial, "Banners"), { recursive: true });
+    await writeFile(join(partial, "Banners", bannerFiles[3]), image("旧版角色"));
+    await writeFile(join(otherPartial, "Banners", bannerFiles[2]), image("其他版武器"));
+    const fromPartial = createBannerTables(resources, [partial, otherPartial], true);
+    expect(await fromPartial("#复刻表")).toEqual(forward(...bannerFiles));
     const cold = createBannerTables(resources, [], true);
     expect(await cold("#星铁光锥复刻表")).toEqual(reply(bannerFiles[0]));
     const current = (await resources.current())!.directory;
@@ -62,6 +70,9 @@ test.skipIf(!Bun.which("git"))("复刻表保留旧游戏过滤、节点顺序和
     expect(await cold("#绝区零复刻表")).toBeUndefined();
     const straight = createBannerTables(resources, [], false);
     expect(await straight("#武器复刻表")).toEqual(["复刻时间表", reply(bannerFiles[0]), reply(bannerFiles[2])]);
+    await rm(join(current, "Banners", bannerFiles[3]));
+    expect(await cold("#角色复刻表")).toEqual(forward(bannerFiles[1], bannerFiles[3]));
+    expect((await resources.current())!.directory).not.toBe(current);
 
     const changed = join(upstream, "Banners", bannerFiles[3]);
     await writeFile(changed, image("新版角色"));
@@ -78,6 +89,12 @@ test.skipIf(!Bun.which("git"))("复刻表保留旧游戏过滤、节点顺序和
     await expect(resources.refresh()).rejects.toThrow("Git fetch");
     expect((await resources.current())!.directory).toBe(updated);
     expect(await cold("#角色复刻表")).toEqual(forward(bannerFiles[1], "新版角色"));
+
+    const disconnected = createOriginalRoleResources({ root: join(root, "disconnected"), cache: join(root, "cache"),
+      fallbacks: [partial, otherPartial], source: pathToFileURL(upstream).href, signal: controller.signal, banners: true });
+    const missing = createBannerTables(disconnected, [partial, otherPartial], true);
+    expect(await missing("#复刻表")).toEqual(["原复刻表暂缺星武器-光锥、星角色、武器。", reply("旧版角色")]);
+    expect(await disconnected.current()).toBeUndefined();
   } finally {
     controller.abort();
     await rm(root, { recursive: true, force: true });
