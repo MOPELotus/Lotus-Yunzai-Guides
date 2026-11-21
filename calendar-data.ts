@@ -28,6 +28,7 @@ export interface CalendarRow {
   readonly start: number;
   readonly end: number;
   readonly earliestEnd?: number;
+  readonly wishDeadline?: number;
   readonly permanent?: boolean;
   readonly startUnverified?: boolean;
   readonly banner?: string;
@@ -49,6 +50,7 @@ interface CalendarPeriod {
   readonly end: number;
   readonly permanent: boolean;
   readonly startUnverified?: boolean;
+  readonly wishDeadline?: number;
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -129,10 +131,10 @@ function zzzInterval(text: string, versions: ReadonlyMap<string, number>): Calen
 }
 
 function genshinInterval(text: string, versions: ReadonlyMap<string, number>, listedEnd: number | undefined) {
-  const headings = /〓(?:活动时间|祈愿介绍|任务开放时间|折扣时间|挑战时间)〓\s*([^〓]+)/gu;
+  const headings = /〓(活动时间|祈愿介绍|任务开放时间|折扣时间|挑战时间)〓\s*([^〓]+)/gu;
   const explicit = new RegExp(`(${dateText})\\s*[-~～至]\\s*(${dateText})`, "u");
   const afterVersion = new RegExp(`(\\d+\\.\\d+|「[^」]+」)版本更新(?:完成)?后\\s*[-~～至]\\s*(${dateText})`, "u");
-  for (const [, section] of text.matchAll(headings)) {
+  for (const [, heading, section] of text.matchAll(headings)) {
     if (!section) continue;
     const interval = explicit.exec(section);
     const version = afterVersion.exec(section);
@@ -141,7 +143,12 @@ function genshinInterval(text: string, versions: ReadonlyMap<string, number>, li
     const start = interval ? calendarTime(interval[1]) : versions.get(version?.[1] ?? persistent?.[1] ?? throughout?.[1] ?? "");
     const end = interval ? calendarTime(interval[2]) : version ? calendarTime(version[2]) :
       persistent ? calendarTime("2099/01/01 00:00:00") : throughout ? listedEnd : undefined;
-    if (start !== undefined && end !== undefined && end > start) return { start, end, permanent: !!persistent };
+    if (start !== undefined && end !== undefined && end > start) {
+      const finish = interval?.[2] ?? version?.[2];
+      const wishDeadline = finish && (heading === "祈愿介绍" || heading === "活动时间")
+        ? end + (/:\d{2}:\d{2}$/u.test(finish) ? 1_000 : 60_000) : undefined;
+      return { start, end, permanent: !!persistent, wishDeadline };
+    }
   }
 }
 
@@ -255,9 +262,11 @@ function snapshot(list: unknown, detail: unknown, updated: number, game: Calenda
     const character = gs && kind === "character" ? /·([^·(（」]+)[(（]/u.exec(title)?.[1] : undefined;
     if (gs && kind === "weapon") title = title.replace(/(?:单手剑|双手剑|长柄武器|弓|法器)·/gu, "");
     if (zz) title = title.replace(/(调频|活动|上新)(?:说明|公告)/gu, "$1").replace(/[」](?:说明|公告)/gu, "」");
+    const wish = gs && (kind === "character" || kind === "weapon" || kind === "chronicled") && /^「[^」]+」祈愿[：:]/u.test(title);
     rows.set(key, {
       title, kind, start, end, permanent: advertised?.permanent, startUnverified: advertised?.startUnverified,
       earliestEnd: advertised ? undefined : warp?.earliestEnd,
+      ...(wish && advertised?.wishDeadline !== undefined && { wishDeadline: advertised.wishDeadline }),
       banner: !gs || activity ? officialCalendarImage(item.banner) ?? officialCalendarImage(item.img) ?? officialCalendarImage(notice?.img) : undefined,
       icon: officialCalendarImage(item.tag_icon), character,
     });

@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import type { CommandReply } from "../../lib/commands.ts";
 import { createCalendarSource, type CalendarGame } from "./calendar-data.ts";
 import { createZzzOfficialCalendar } from "./zzz-official-calendar.ts";
+import { genshinWishCountdown, matchesGenshinWishCountdown } from "./genshin-wish-countdown.ts";
 
 const games = {
   starrail: { label: "星铁", rule: /^#星铁日历(列表)?$/u, theme: "LOTUS_STAR_RAIL_GACHA_THEME_DIR" },
@@ -19,6 +20,7 @@ function createGameCalendar(game: CalendarGame, options: {
   const defaultTheme = fileURLToPath(new URL(`../../data/${game === "zzz" ? "genshin" : game}/miao-theme/`, import.meta.url));
   const source = createCalendarSource(game, options);
   return (message: string): CommandReply | Promise<CommandReply> | undefined => {
+    if (game === "genshin" && matchesGenshinWishCountdown(message)) return genshinWishCountdown(source, options);
     const match = config.rule.exec(message.trim());
     if (!match) return;
     return (async () => {
