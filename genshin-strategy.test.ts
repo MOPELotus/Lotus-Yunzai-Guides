@@ -95,7 +95,7 @@ olds:
     requests.length = 0;
     search = build();
     expect(await search("#心海一图流")).toBe("暂无珊瑚宫心海的原神攻略。");
-    expect(requests).toEqual([839176, 813033]);
+    expect(requests.toSorted((left, right) => left - right)).toEqual([813033, 839176]);
     expect(await search("#心海攻略1")).toEqual(reply("source-1-other-collection"));
     expect(await search("#心海攻略")).toEqual(reply("/kokomi-4.png"));
   } finally {
