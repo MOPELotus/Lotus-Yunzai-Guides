@@ -290,24 +290,38 @@ export function buildZzzCalendar(list: unknown, content: unknown, now: number): 
   return calendarWindow(snapshot(list, content, now, "zzz"), now);
 }
 
-async function readJson(response: Response) {
-  if (!response.ok || !response.body) throw new Error("无法访问游戏官方公告。");
+export async function readCalendarBytes(response: Response, limit: number) {
+  if (!response.ok || !response.body || Number(response.headers.get("content-length")) > limit) {
+    await response.body?.cancel().catch(() => {});
+    throw new Error("无法访问游戏官方公告。");
+  }
   const reader = response.body.getReader();
   let size = 0;
   const chunks: Uint8Array[] = [];
   try {
     for (;;) {
       const chunk = await reader.read();
-      if (chunk.done) break;
+      if (chunk.done) return Buffer.concat(chunks, size);
       size += chunk.value.length;
-      if (size > 4 * 1024 * 1024) throw new Error("游戏公告响应超限。");
+      if (size > limit) throw new Error("游戏公告响应超限。");
       chunks.push(chunk.value);
     }
-    return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
   } finally {
     await reader.cancel().catch(() => {});
     reader.releaseLock();
   }
+}
+
+export function calendarTransport(transport: typeof fetch, active?: AbortSignal) {
+  return (url: string) => {
+    const timeout = AbortSignal.timeout(12_000);
+    const signal = active ? AbortSignal.any([active, timeout]) : timeout;
+    return transport(url, { signal, redirect: "error", credentials: "omit" });
+  };
+}
+
+export async function readCalendarJson(response: Response) {
+  return JSON.parse((await readCalendarBytes(response, 4 * 1024 * 1024)).toString("utf8")) as unknown;
 }
 
 export function createCalendarSource(game: CalendarGame, options: {
@@ -315,7 +329,7 @@ export function createCalendarSource(game: CalendarGame, options: {
   readonly signal?: AbortSignal;
   readonly now?: () => number;
 } = {}) {
-  const transport = options.fetch ?? fetch;
+  const transport = calendarTransport(options.fetch ?? fetch, options.signal);
   const [listUrl, contentUrl] = ({
     genshin: [genshinCalendarListUrl, genshinCalendarContentUrl], starrail: [calendarListUrl, calendarContentUrl],
     zzz: [zzzCalendarListUrl, zzzCalendarContentUrl],
@@ -323,11 +337,7 @@ export function createCalendarSource(game: CalendarGame, options: {
   const now = options.now ?? Date.now;
   let retained: ReturnType<typeof snapshot> | undefined;
   let active: Promise<ReturnType<typeof snapshot>> | undefined;
-  function request(url: string) {
-    const timeout = AbortSignal.timeout(12_000);
-    const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
-    return transport(url, { signal, redirect: "error", credentials: "omit" }).then(readJson);
-  }
+  const request = (url: string) => transport(url).then(readCalendarJson);
   return async () => {
     const time = now();
     if (retained && time - retained.updated < (retained.detailsAvailable ? 600_000 : 60_000)) {

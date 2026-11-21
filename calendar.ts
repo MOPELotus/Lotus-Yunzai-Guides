@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import type { CommandReply } from "../../lib/commands.ts";
 import { createCalendarSource, type CalendarGame } from "./calendar-data.ts";
+import { createZzzOfficialCalendar } from "./zzz-official-calendar.ts";
 
 const games = {
   starrail: { label: "星铁", rule: /^#星铁日历(列表)?$/u, theme: "LOTUS_STAR_RAIL_GACHA_THEME_DIR" },
@@ -39,4 +40,8 @@ function createGameCalendar(game: CalendarGame, options: {
 
 export const createStarrailCalendar = (options?: Parameters<typeof createGameCalendar>[1]) => createGameCalendar("starrail", options);
 export const createGenshinCalendar = (options?: Parameters<typeof createGameCalendar>[1]) => createGameCalendar("genshin", options);
-export const createZzzCalendar = (options?: Parameters<typeof createGameCalendar>[1]) => createGameCalendar("zzz", options);
+export function createZzzCalendar(options?: Parameters<typeof createGameCalendar>[1]) {
+  const official = createZzzOfficialCalendar(options);
+  const rendered = createGameCalendar("zzz", options);
+  return (message: string) => official(message) ?? rendered(message);
+}
