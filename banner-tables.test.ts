@@ -41,7 +41,7 @@ test.skipIf(!Bun.which("git"))("复刻表保留旧游戏过滤、节点顺序和
     git("config", "uploadpack.allowAnySHA1InWant", "true");
     commit("旧复刻表");
     const resources = createOriginalRoleResources({ root: origin, cache: join(root, "cache"), fallbacks: [legacy],
-      source: pathToFileURL(upstream).href, signal: controller.signal, banners: true });
+      source: pathToFileURL(upstream).href, signal: controller.signal, scope: "banners" });
     const fallback = createBannerTables(resources, [legacy], true);
     expect(await fallback("#复刻表")).toEqual(forward(...bannerFiles));
     expect(await resources.current()).toBeUndefined();
@@ -91,7 +91,7 @@ test.skipIf(!Bun.which("git"))("复刻表保留旧游戏过滤、节点顺序和
     expect(await cold("#角色复刻表")).toEqual(forward(bannerFiles[1], "新版角色"));
 
     const disconnected = createOriginalRoleResources({ root: join(root, "disconnected"), cache: join(root, "cache"),
-      fallbacks: [partial, otherPartial], source: pathToFileURL(upstream).href, signal: controller.signal, banners: true });
+      fallbacks: [partial, otherPartial], source: pathToFileURL(upstream).href, signal: controller.signal, scope: "banners" });
     const missing = createBannerTables(disconnected, [partial, otherPartial], true);
     expect(await missing("#复刻表")).toEqual(["原复刻表暂缺星武器-光锥、星角色、武器。", reply("旧版角色")]);
     expect(await disconnected.current()).toBeUndefined();

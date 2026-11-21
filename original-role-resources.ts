@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { link, lstat, mkdir, mkdtemp, readlink, readdir, rename, rm, symlink, utimes } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { lockFile } from "../../lib/file-lock.ts";
+import { abyssReferencePaths, isAbyssReferencePath, requiredAbyssReferences } from "./abyss-references.ts";
 import { bannerFiles } from "./banner-tables.ts";
 import { guideGames, safeGuideName } from "./role-guide-input.ts";
 import { isGuideImage, roleImageLimit, writeGuideFile } from "./role-image-files.ts";
@@ -10,6 +11,8 @@ import { cleanGuideStages, fetchGuideBlobs, guideBlobId, guideSource, guideSourc
 
 const rolePaths = ["Genshin/Roles/Guides", "Genshin/Roles/RefStat", "Genshin/Roles/YieldCurve",
   "StarRail/Roles/Guides", "StarRail/Roles/RefStat", "ZenlessZoneZero/Roles/Guides"] as const;
+const sourcePaths = { roles: rolePaths, banners: ["Banners"], abyss: abyssReferencePaths } as const;
+type Scope = keyof typeof sourcePaths;
 const hashPattern = /^[0-9a-f]{40}$/u;
 const snapshotPattern = /^snapshots\/([0-9a-f]{40})-[0-9a-f-]{36}$/u;
 const batchSize = 8;
@@ -22,24 +25,27 @@ interface Resource {
   readonly notes: boolean;
 }
 
-function sourceResources(output: Uint8Array, paths: readonly string[], banners: boolean) {
+function sourceResources(output: Uint8Array, scope: Scope) {
   const resources: Resource[] = [];
   for (const row of Buffer.from(output).toString("utf8").split("\0")) {
     const [metadata, ...rest] = row.split("\t");
     const path = rest.join("\t");
-    const base = paths.find((candidate) => path.startsWith(candidate + "/"));
+    const base = sourcePaths[scope].find((candidate) => path.startsWith(candidate + "/"));
     if (!base) continue;
     const parts = path.slice(base.length + 1).split("/");
     if (parts.some((part) => !safeGuideName(part)) || parts.length !== (base.endsWith("/Guides") ? 2 : 1)) continue;
     const file = parts.at(-1)!;
-    if (banners && !bannerFiles.some(name => name === file)) continue;
+    if (scope === "banners" && !bannerFiles.some(name => name === file)) continue;
+    if (scope === "abyss" && !isAbyssReferencePath(path)) continue;
     const notes = base.endsWith("/RefStat") && file === "RefNotes.yaml";
     if (!notes && !/\.(?:png|jpe?g|webp)$/iu.test(file)) continue;
     const hash = /^100644 blob ([0-9a-f]{40})$/u.exec(metadata ?? "")?.[1];
     if (!hash) throw new Error("角色原资源文件格式无效。");
     resources.push({ path, hash, notes });
   }
-  if (!resources.some(({ notes }) => !notes) || resources.length > 4000 || banners && resources.length !== bannerFiles.length) {
+  const requiredAbyssFileMissing = scope === "abyss" && !requiredAbyssReferences.every(path => resources.some(item => item.path === path));
+  if (!resources.some(({ notes }) => !notes) || resources.length > 4000 || requiredAbyssFileMissing ||
+      scope === "banners" && resources.length !== bannerFiles.length) {
     throw new Error("攻略原资源清单不完整。");
   }
   return resources;
@@ -74,15 +80,15 @@ async function existingObjects(cache: string) {
 
 export type OriginalRoleResources = ReturnType<typeof createOriginalRoleResources>;
 
-export function createOriginalRoleResources({ root, cache, fallbacks, signal, source = guideSource, banners = false }: {
+export function createOriginalRoleResources({ root, cache, fallbacks, signal, source = guideSource, scope = "roles" }: {
   readonly root: string;
   readonly cache: string;
   readonly fallbacks: readonly string[];
   readonly signal: AbortSignal;
   readonly source?: string;
-  readonly banners?: boolean;
+  readonly scope?: Scope;
 }) {
-  const paths = banners ? ["Banners"] : rolePaths;
+  const paths = sourcePaths[scope];
   const objects = join(root, "objects");
   const pending = join(root, "pending");
   const checked = join(root, "checked");
@@ -100,7 +106,7 @@ export function createOriginalRoleResources({ root, cache, fallbacks, signal, so
   }
 
   async function download(): Promise<"updated" | "current"> {
-    const attempt = AbortSignal.any([signal, AbortSignal.timeout(banners ? 75_000 : 20 * 60 * 1000)]);
+    const attempt = AbortSignal.any([signal, AbortSignal.timeout(scope === "roles" ? 20 * 60 * 1000 : 75_000)]);
     attempt.throwIfAborted();
     await mkdir(root, { recursive: true, mode: 0o700 });
     const lock = await lockFile(join(root, "refresh.lock"), "角色原资源");
@@ -111,17 +117,17 @@ export function createOriginalRoleResources({ root, cache, fallbacks, signal, so
       await writeGuideFile(pending, "");
       temporary = await mkdtemp(join(root, ".install-"));
       const git = await prepareGuideSourceGit(temporary, source, attempt);
-      const resources = sourceResources(await git(["ls-tree", "-r", "-z", guideSourceRef, "--", ...paths]), paths, banners);
+      const resources = sourceResources(await git(["ls-tree", "-r", "-z", guideSourceRef, "--", ...paths]), scope);
       const tree = createHash("sha1").update(JSON.stringify(resources)).digest("hex");
       const previous = await current();
-      if (previous?.tree === tree && (!banners || (await Promise.all(resources.map(item =>
+      if (previous?.tree === tree && (scope === "roles" || (await Promise.all(resources.map(item =>
         readLocalGuideBlob(previous.directory, item.path, item.hash, limit(item))))).every(Boolean))) {
         await writeGuideFile(checked, "");
         await rm(pending, { force: true });
         return "current";
       }
 
-      const local = banners ? undefined : await existingObjects(cache);
+      const local = scope === "roles" ? await existingObjects(cache) : undefined;
       const stage = join(temporary, "stage");
       await mkdir(objects, { recursive: true });
       const unique = [...new Map(resources.map(item => [item.hash, item])).values()];
