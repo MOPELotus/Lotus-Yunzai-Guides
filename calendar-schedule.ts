@@ -54,7 +54,7 @@ const oneStep = /^#定时(?:任务表|群聊表|添加群聊[黑白]名单)$/u;
 const addTask = /^#定时添加任务(?:\s|$)/u;
 const taskSyntax = /^#定时添加任务 time="([^"\r\n]+)" (S|G|\*)$/u;
 const stateName = "calendar-schedule.json";
-const legacyNames = ["AutoCalendarWhiteList.json", "AutoCalendarBlackList.json", "AutoCalendarTasks.json"];
+const legacyNames = ["AutoCalendarWhiteList.json", "AutoCalendarBlackList.json", "AutoCalendarTasks.json"] as const;
 const maxStateBytes = 128 * 1024;
 const maxGroups = 1024;
 const maxTasks = 64;
@@ -136,6 +136,36 @@ async function readSource(file: string): Promise<string | undefined> {
   }
 }
 
+function stateRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function currentState(data: unknown): State {
+  if (!stateRecord(data) || data.version !== 1) throw new Error("日历状态版本无效。");
+  return { version: 1, whiteList: groupList(data.whiteList), blackList: groupList(data.blackList), tasks: taskList(data.tasks) };
+}
+
+export async function prepareLegacyCalendar(file: string) {
+  const source = await readSource(file);
+  if (source === undefined) throw new Error("未找到新版定时日历副本。");
+  const data: unknown = JSON.parse(source);
+  if (!stateRecord(data) || Object.keys(data).some((key) => !["version", "whiteList", "blackList", "tasks"].includes(key)) ||
+      !Array.isArray(data.tasks) || data.tasks.some((entry: unknown) =>
+        !stateRecord(entry) || Object.keys(entry).some((key) => key !== "cron" && key !== "type"))) {
+    throw new Error("日历副本格式无效或包含旧版不能表示的配置。");
+  }
+  const state = currentState(data);
+  const { whiteList, blackList, tasks } = state;
+  return {
+    counts: { whiteList: whiteList.length, blackList: blackList.length, tasks: tasks.length },
+    files: {
+      [legacyNames[0]]: `${JSON.stringify(whiteList.map(String), null, 2)}\n`,
+      [legacyNames[1]]: `${JSON.stringify(blackList.map(String), null, 2)}\n`,
+      [legacyNames[2]]: `${JSON.stringify(tasks, null, 2)}\n`,
+    },
+  };
+}
+
 function calendarScheduleStore(options: CalendarScheduleOptions) {
   const directory = fileURLToPath(new URL("data/guides/", options.root));
   const legacy = fileURLToPath(new URL("plugins/example/", options.root));
@@ -156,9 +186,7 @@ function calendarScheduleStore(options: CalendarScheduleOptions) {
         tasks: tasks === undefined ? [] : taskList(JSON.parse(tasks)),
       };
     }
-    const data = JSON.parse(current);
-    if (data?.version !== 1) throw new Error("日历状态版本无效。");
-    return { version: 1, whiteList: groupList(data.whiteList), blackList: groupList(data.blackList), tasks: taskList(data.tasks) };
+    return currentState(JSON.parse(current));
   }
 
   return {

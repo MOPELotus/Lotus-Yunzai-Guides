@@ -4,11 +4,32 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { lockFile } from "../../lib/file-lock.ts";
-import { createCalendarSchedule, type CalendarScheduleKind, type CalendarScheduleOptions } from "./calendar-schedule.ts";
+import { createCalendarSchedule, prepareLegacyCalendar, type CalendarScheduleKind, type CalendarScheduleOptions } from "./calendar-schedule.ts";
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
   for (const clean of cleanups.splice(0).reverse()) await clean();
+});
+
+test("原版日历交还保持名单范围、转成字符串 ID 并拒绝不可表示的路由", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "lotus-calendar-export-"));
+  cleanups.push(() => rm(directory, { recursive: true, force: true }));
+  const snapshot = join(directory, "snapshot.json");
+  const state = { version: 1, whiteList: [77, "78", 77], blackList: [77],
+    tasks: [{ cron: "0 3 31 12 *", type: "G" }, { cron: "0 0 3 31 12 *", type: "G" }] };
+  await writeFile(snapshot, JSON.stringify(state));
+  const { counts, files } = await prepareLegacyCalendar(snapshot);
+  expect(counts).toEqual({ whiteList: 2, blackList: 1, tasks: 1 });
+  expect(Object.fromEntries(Object.entries(files).map(([name, value]) => [name, JSON.parse(value)]))).toEqual({
+    "AutoCalendarWhiteList.json": ["77", "78"],
+    "AutoCalendarBlackList.json": ["77"],
+    "AutoCalendarTasks.json": [state.tasks[0]],
+  });
+  for (const unsupported of [{ ...state, account: "99" },
+    { ...state, tasks: [{ ...state.tasks[0], adapter: "milky" }] }]) {
+    await writeFile(snapshot, JSON.stringify(unsupported));
+    await expect(prepareLegacyCalendar(snapshot)).rejects.toThrow("旧版不能表示");
+  }
 });
 
 async function fixture(overrides: Partial<CalendarScheduleOptions> = {}) {
