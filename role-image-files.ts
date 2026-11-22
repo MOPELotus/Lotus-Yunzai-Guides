@@ -1,3 +1,4 @@
+import { renameSync } from "node:fs";
 import { mkdir, realpath, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import { guideKey, safeGuideName } from "./role-guide-input.ts";
@@ -24,12 +25,19 @@ export async function readGuideImage(root: string, file: string): Promise<Buffer
   if (bytes && isGuideImage(bytes)) return bytes;
 }
 
-export async function writeGuideFile(file: string, bytes: string | Uint8Array) {
+export async function writeGuideFile(file: string, bytes: string | Uint8Array, canWrite?: () => boolean) {
   await mkdir(dirname(file), { recursive: true });
   const temporary = file + "." + crypto.randomUUID() + ".tmp";
   try {
     await writeFile(temporary, bytes, { flag: "wx" });
-    await rename(temporary, file);
+    if (canWrite) {
+      // Check the panel session in the same turn that publishes its settings.
+      if (!canWrite()) return false;
+      renameSync(temporary, file);
+    } else {
+      await rename(temporary, file);
+    }
+    return true;
   } finally {
     await rm(temporary, { force: true });
   }

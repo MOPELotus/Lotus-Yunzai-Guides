@@ -3,8 +3,10 @@ import { mkdir, open, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 import { Job } from "node-schedule";
 import type { MessageReply } from "../../lib/messages.ts";
+import { GuideSettingsError } from "./guide-configuration.ts";
 
 export type CalendarScheduleKind = "S" | "G" | "*";
 type Outcome = "confirmed" | "rejected" | "unknown";
@@ -34,6 +36,11 @@ export interface CalendarScheduleOptions {
 export interface CalendarSchedule {
   matchesCommand(message: string): boolean;
   handle(message: string, owner?: CalendarScheduleOwner): Promise<string | undefined>;
+  readSettings(): Promise<CalendarScheduleSettings>;
+  writeSettings(previous: unknown, next: unknown, session: {
+    readonly signal: AbortSignal;
+    readonly canWrite: () => boolean;
+  }): Promise<CalendarScheduleSettings>;
   stop(): Promise<void>;
 }
 
@@ -42,11 +49,14 @@ interface Task {
   readonly type: CalendarScheduleKind;
 }
 
-interface State {
-  readonly version: 1;
+export interface CalendarScheduleSettings {
   readonly whiteList: readonly number[];
   readonly blackList: readonly number[];
   readonly tasks: readonly Task[];
+}
+
+interface State extends CalendarScheduleSettings {
+  readonly version: 1;
 }
 
 const empty: State = { version: 1, whiteList: [], blackList: [], tasks: [] };
@@ -145,6 +155,23 @@ function currentState(data: unknown): State {
   return { version: 1, whiteList: groupList(data.whiteList), blackList: groupList(data.blackList), tasks: taskList(data.tasks) };
 }
 
+function panelState(input: unknown): State {
+  if (!stateRecord(input) || Object.keys(input).length !== 3 ||
+      !Object.hasOwn(input, "whiteList") || !Object.hasOwn(input, "blackList") || !Object.hasOwn(input, "tasks")) {
+    throw new GuideSettingsError("input");
+  }
+  if (!Array.isArray(input.tasks) || input.tasks.some((entry: unknown) => !stateRecord(entry) ||
+      Object.keys(entry).length !== 2 || !Object.hasOwn(entry, "cron") || !Object.hasOwn(entry, "type"))) {
+    throw new GuideSettingsError("input");
+  }
+  try { return currentState({ ...input, version: 1 }); }
+  catch { throw new GuideSettingsError("input"); }
+}
+
+function settingsOf({ whiteList, blackList, tasks }: State): CalendarScheduleSettings {
+  return { whiteList, blackList, tasks };
+}
+
 export async function prepareLegacyCalendar(file: string) {
   const source = await readSource(file);
   if (source === undefined) throw new Error("未找到新版定时日历副本。");
@@ -191,8 +218,9 @@ function calendarScheduleStore(options: CalendarScheduleOptions) {
 
   return {
     async read() { return decode(await sources()); },
-    async update(change: (state: State) => State, signal: AbortSignal): Promise<{ state: State; changed: boolean }> {
+    async update(change: (state: State) => State, signal: AbortSignal, canWrite?: () => boolean): Promise<{ state: State; changed: boolean }> {
       signal.throwIfAborted();
+      if (canWrite && !canWrite()) throw new GuideSettingsError("permission");
       await mkdir(directory, { recursive: true, mode: 0o700 });
       const lock = await options.lockFile(join(directory, ".calendar-schedule.sqlite"), "定时日历");
       try {
@@ -200,6 +228,7 @@ function calendarScheduleStore(options: CalendarScheduleOptions) {
         const previous = await sources();
         const current = decode(previous);
         const state = change(current);
+        if (canWrite && !canWrite()) throw new GuideSettingsError("permission");
         if (state === current) return { state, changed: false };
         const bytes = Buffer.from(JSON.stringify(state, null, 2) + "\n");
         if (bytes.length > maxStateBytes) throw new Error("日历状态超出大小上限。");
@@ -217,6 +246,7 @@ function calendarScheduleStore(options: CalendarScheduleOptions) {
             throw new Error("日历状态已由其他程序修改。");
           }
           signal.throwIfAborted();
+          if (canWrite && !canWrite()) throw new GuideSettingsError("permission");
           renameSync(staging, file);
         } finally {
           await unlink(staging).catch((error: NodeJS.ErrnoException) => {
@@ -244,8 +274,9 @@ export async function createCalendarSchedule(options: CalendarScheduleOptions): 
   let lastDelivery: number | undefined;
   const wait = options.wait ?? ((milliseconds: number, active: AbortSignal) => delay(milliseconds, undefined, { signal: active, ref: false }));
 
-  async function send(type: CalendarScheduleKind) {
-    if (signal.aborted) return;
+  async function send(type: CalendarScheduleKind, registered: () => boolean) {
+    const active = () => !signal.aborted && registered();
+    if (!active()) return;
     const denied = new Set(state.blackList);
     const selected = new Set(state.whiteList.filter((id) => !denied.has(id)));
     if (!selected.size) return;
@@ -253,29 +284,29 @@ export async function createCalendarSchedule(options: CalendarScheduleOptions): 
     try {
       targets = await options.targets([...selected], signal);
     } catch {
-      if (!signal.aborted) options.report?.("targets", "unknown");
+      if (active()) options.report?.("targets", "unknown");
       return;
     }
     const queue = targets.filter(({ groupId }) => selected.delete(groupId));
-    if (!queue.length || signal.aborted) return;
+    if (!queue.length || !active()) return;
     let message: MessageReply | undefined;
     try {
       message = await options.render(type, signal);
     } catch {
-      if (!signal.aborted) options.report?.("render", "unknown");
+      if (active()) options.report?.("render", "unknown");
       return;
     }
     if (message === undefined || Array.isArray(message) && !message.length) {
-      if (!signal.aborted) options.report?.("render", "rejected");
+      if (active()) options.report?.("render", "rejected");
       return;
     }
     for (const target of queue) {
-      if (signal.aborted) return;
+      if (!active()) return;
       if (!state.whiteList.includes(target.groupId) || state.blackList.includes(target.groupId)) continue;
       const remaining = lastDelivery === undefined ? 0 : 5000 - (performance.now() - lastDelivery);
       if (remaining > 0) {
         try { await wait(Math.ceil(remaining), signal); } catch { return; }
-        if (signal.aborted) return;
+        if (!active()) return;
         if (!state.whiteList.includes(target.groupId) || state.blackList.includes(target.groupId)) continue;
       }
       let outcome: Outcome;
@@ -286,10 +317,11 @@ export async function createCalendarSchedule(options: CalendarScheduleOptions): 
   }
 
   function trigger(key: string, type: CalendarScheduleKind): Promise<void> {
-    if (signal.aborted || !jobs.has(key)) return Promise.resolve();
+    const registration = jobs.get(key);
+    if (signal.aborted || !registration) return Promise.resolve();
     const current = running.get(key);
     if (current) return current;
-    const next = queue.then(() => send(type)).finally(() => running.delete(key));
+    const next = queue.then(() => send(type, () => jobs.get(key) === registration)).finally(() => running.delete(key));
     queue = next.catch(() => {});
     running.set(key, next);
     return next;
@@ -306,6 +338,29 @@ export async function createCalendarSchedule(options: CalendarScheduleOptions): 
       options.report?.("register", "rejected");
       return false;
     }
+  }
+
+  async function writeSettings(previousValue: unknown, nextValue: unknown, session: {
+    readonly signal: AbortSignal; readonly canWrite: () => boolean;
+  }) {
+    const previous = panelState(previousValue), next = panelState(nextValue);
+    const active = AbortSignal.any([signal, session.signal]);
+    const allowed = () => !active.aborted && session.canWrite();
+    const result = await store.update(current => {
+      if (!isDeepStrictEqual(current, previous)) throw new GuideSettingsError("conflict");
+      return isDeepStrictEqual(current, next) ? current : next;
+    }, active, allowed);
+    state = result.state;
+    const taskKeys = new Set(state.tasks.map(taskKey));
+    const removed = [];
+    for (const [key, dispose] of jobs) {
+      if (taskKeys.has(key)) continue;
+      jobs.delete(key);
+      removed.push(dispose);
+    }
+    for (const task of state.tasks) register(task);
+    await Promise.allSettled(removed.map(async dispose => dispose()));
+    return settingsOf(state);
   }
 
   const stop = (): Promise<void> => stopping ??= (async () => {
@@ -398,5 +453,6 @@ export async function createCalendarSchedule(options: CalendarScheduleOptions): 
     }
   }
 
-  return { matchesCommand: matchesCalendarScheduleCommand, handle, stop };
+  return { matchesCommand: matchesCalendarScheduleCommand, handle, stop,
+    readSettings: async () => settingsOf(await store.read()), writeSettings };
 }

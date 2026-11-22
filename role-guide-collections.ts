@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { guideGames, guideKey, safeGuideName, type GuideGame, type GuideRole } from "./role-guide-input.ts";
 import { isGuideImage, roleImageLimit } from "./role-image-files.ts";
+import { configuredGuideCollection } from "./guide-configuration.ts";
 
 type Author = { readonly source: string; readonly collection_id: readonly number[] };
 
@@ -27,16 +28,23 @@ function authors(value: unknown): Author[] {
   });
 }
 
-async function readAuthors(game: GuideGame, root?: string) {
-  const filename = guideGames[game].config;
-  function parse(source: string) {
-    const yaml = Bun.YAML.parse(source);
-    if (game === "gs") {
-      const { news, olds } = object(yaml);
-      return { news: authors(news ?? []), olds: authors(olds ?? []) };
-    }
-    return { news: authors(yaml), olds: [] };
+export function parseGuideCollections(game: GuideGame, value: unknown) {
+  if (game === "gs") {
+    const { news, olds } = object(value);
+    return { news: authors(news ?? []), olds: authors(olds ?? []) };
   }
+  return { news: authors(value), olds: [] };
+}
+
+export async function readGuideAuthors(game: GuideGame, root?: string, settingsRoot?: URL) {
+  const filename = guideGames[game].config;
+  if (settingsRoot) {
+    try {
+      const configured = await configuredGuideCollection(game, settingsRoot);
+      if (configured !== undefined) return parseGuideCollections(game, configured);
+    } catch {}
+  }
+  const parse = (source: string) => parseGuideCollections(game, Bun.YAML.parse(source));
   if (root) {
     try { return parse(await readFile(join(root, filename), "utf8")); } catch {}
   }
@@ -118,6 +126,7 @@ function selectImage(posts: readonly Record<string, unknown>[], role: GuideRole,
 
 export function createRoleGuideCollections(options: {
   readonly config?: string;
+  readonly settingsRoot?: URL;
   readonly fetch?: typeof fetch;
   readonly signal?: AbortSignal;
 }) {
@@ -168,7 +177,7 @@ export function createRoleGuideCollections(options: {
   }
 
   return {
-    authors: (game: GuideGame) => readAuthors(game, options.config),
+    authors: (game: GuideGame) => readGuideAuthors(game, options.config, options.settingsRoot),
     async image(role: GuideRole, author: Author, refresh = false, numbered?: "gs" | "zzz"): Promise<Buffer | undefined> {
       try {
         const zzz = numbered === "zzz";

@@ -16,6 +16,7 @@ export function createRoleGuides(options: {
   readonly legacyZzzRoot?: string;
   readonly atlas?: string;
   readonly config?: string;
+  readonly settingsRoot?: URL;
   readonly guidePack?: RolePackFallback;
   readonly guideSnapshot?: RolePackSnapshot;
   readonly guideAutomatic?: boolean;

@@ -1,4 +1,7 @@
-import { dirname, basename } from "node:path";
+import { mkdir } from "node:fs/promises";
+import { dirname, basename, join } from "node:path";
+import { lockFile } from "../../lib/file-lock.ts";
+import { GuideSettingsError } from "./guide-configuration.ts";
 import { readGuideFile, writeGuideFile } from "./role-image-files.ts";
 
 // TRSS Genshin strategy.js at 0290a17 defines these permanent source numbers.
@@ -43,13 +46,29 @@ export function createGenshinStrategyPreference(file: string, legacy?: string) {
     } catch {}
   }
 
+  async function get() {
+    return await read(file, JSON.parse) ?? (legacy ? await read(legacy, Bun.YAML.parse) : undefined) ?? 1;
+  }
   return {
-    async get() {
-      return await read(file, JSON.parse) ?? (legacy ? await read(legacy, Bun.YAML.parse) : undefined) ?? 1;
-    },
-    async set(source: number) {
-      if (!validSource(source)) throw new Error("攻略来源编号无效。");
-      await writeGuideFile(file, JSON.stringify({ defaultSource: source }) + "\n");
+    get,
+    async set(source: number, { previous, canWrite }: { readonly previous?: number; readonly canWrite?: () => boolean } = {}) {
+      if (!validSource(source)) throw new GuideSettingsError("input");
+      if (canWrite && !canWrite()) throw new GuideSettingsError("permission");
+      const directory = dirname(file);
+      await mkdir(directory, { recursive: true, mode: 0o700 });
+      const lock = await lockFile(join(directory, ".genshin-strategy.sqlite"), "原神攻略设置");
+      try {
+        const latest = await get();
+        if (previous !== undefined && latest !== previous) throw new GuideSettingsError("conflict");
+        if (canWrite && !canWrite()) throw new GuideSettingsError("permission");
+        if ((previous === undefined || latest !== source) &&
+            !await writeGuideFile(file, JSON.stringify({ defaultSource: source }) + "\n", canWrite)) {
+          throw new GuideSettingsError("permission");
+        }
+        return source;
+      } finally {
+        lock.close();
+      }
     },
   };
 }

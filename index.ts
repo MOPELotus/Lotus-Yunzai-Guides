@@ -12,6 +12,7 @@ import { createBannerTables } from "./banner-tables.ts";
 import { createAbyssReferences } from "./abyss-references.ts";
 import { createGenshinCalendar, createStarrailCalendar, createZzzCalendar } from "./calendar.ts";
 import { createCalendarSchedule, type CalendarSchedule, type CalendarScheduleOptions } from "./calendar-schedule.ts";
+import { guideFlags, readGuidesConfiguration } from "./guide-configuration.ts";
 
 type TeamResources = ReturnType<typeof createTeamResources>;
 
@@ -127,13 +128,14 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
   };
 }) {
   const directory = Bun.env.LOTUS_GUIDES_TEAM_DIR?.trim();
-  const forward = Bun.env.LOTUS_GUIDES_FORWARD !== "0";
+  const installation = new URL("../../", import.meta.url);
+  const { forward, auto_update: autoUpdate } = guideFlags(await readGuidesConfiguration(installation).catch(() => ({})));
   const controller = new AbortController();
   const refreshSignal = AbortSignal.any([signal, controller.signal]);
   const data = (path: string) => fileURLToPath(new URL(path, import.meta.url));
   const cache = Bun.env.LOTUS_GUIDES_ROLE_DIR?.trim() || data("../../data/guides/roleGuides/");
   const configuredPack = Bun.env.LOTUS_GUIDES_MORA_PACK_DIR?.trim();
-  const guideAutomatic = !!guidesSchedule && Bun.env.LOTUS_GUIDES_AUTO_UPDATE !== "0";
+  const guideAutomatic = !!guidesSchedule && autoUpdate;
   const guidePack = configuredPack ? [configuredPack] : [data("../../data/guides/mora-plugin-res/"),
     data("../mora-plugin/resources/mora-plugin-res/")];
   const original = createOriginalRoleResources({ root: data("../../data/guides/role-origin/"),
@@ -148,6 +150,7 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
   const guideOptions = {
     cache,
     config: Bun.env.LOTUS_GUIDES_ROLE_CONFIG_DIR?.trim() || data("../../config/guides/"),
+    settingsRoot: installation,
     atlas: Bun.env.LOTUS_GUIDES_LEGACY_ATLAS_DIR?.trim() || data("../../data/guides/legacy-atlas/"),
     guidePack,
     guideSnapshot: original.current,
@@ -166,7 +169,7 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
   const resources = directory ? undefined : createTeamResources({ root, fallback: legacyDirectory,
     alternatives: guidePack.map(pack => join(pack, "Genshin", "TeamGuides")), signal: refreshSignal });
   const scheduled = guidesSchedule && await createCalendarSchedule({
-    signal: refreshSignal, root: new URL("../../", import.meta.url), lockFile,
+    signal: refreshSignal, root: installation, lockFile,
     register: guidesSchedule.registerTask, targets: guidesSchedule.targets,
     async render(type, active) {
       const replies = await Promise.all([

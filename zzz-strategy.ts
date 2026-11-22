@@ -5,6 +5,7 @@ import type { MessageSegment } from "../../lib/messages.ts";
 import { lockFile } from "../../lib/file-lock.ts";
 import type { createRoleGuideCollections } from "./role-guide-collections.ts";
 import { guideKey, safeGuideName } from "./role-guide-input.ts";
+import { GuideSettingsError } from "./guide-configuration.ts";
 import { readGuideFile, readGuideImage, writeGuideFile } from "./role-image-files.ts";
 
 // ZZZ-Plugin dist/lib/guides.js, 2057599. Public MiYouShe ZZZ collections in source-number order.
@@ -58,6 +59,58 @@ function configNumber(value: unknown) {
   return typeof value === "string" && /^\d+$/u.test(value) ? Number(value) : value;
 }
 
+export const zzzStrategyOptions = [
+  { value: 0, label: "全部来源" },
+  ...sources.map((author, index) => ({ value: index + 1, label: `${index + 1} · ${author.source}` })),
+];
+
+export function createZzzStrategySettings(options: { readonly cache: string; readonly legacyRoot?: string }) {
+  async function readValues(): Promise<{ effective: Settings; current: Partial<Settings> }> {
+    const [defaults, legacy, current] = await Promise.all([
+      object(options.legacyRoot, "defSet/guide.yaml", Bun.YAML.parse),
+      object(options.legacyRoot, "config/guide.yaml", Bun.YAML.parse),
+      object(options.cache, settingsFile, JSON.parse),
+    ]);
+    const saved = configValues(current);
+    return { effective: { ...settingsDefaults, ...configValues(defaults), ...configValues(legacy), ...saved }, current: saved };
+  }
+
+  return {
+    async read() { return (await readValues()).effective; },
+    async write(patch: Partial<Settings>, { previous, canWrite }: {
+      readonly previous?: Settings; readonly canWrite?: () => boolean;
+    } = {}) {
+      for (const [key, value] of Object.entries(patch)) {
+        if (!(key === "default_guide" ? validInteger(value, 0) : key === "max_forward_guides" && validInteger(value, 1))) {
+          throw new GuideSettingsError("input");
+        }
+      }
+      if (canWrite && !canWrite()) throw new GuideSettingsError("permission");
+      await mkdir(options.cache, { recursive: true, mode: 0o700 });
+      const lock = await lockFile(join(options.cache, ".zzz-strategy.sqlite"), "绝区零攻略设置");
+      try {
+        const { effective, current } = await readValues();
+        if (previous && (previous.default_guide !== effective.default_guide ||
+          previous.max_forward_guides !== effective.max_forward_guides)) throw new GuideSettingsError("conflict");
+        if (canWrite && !canWrite()) throw new GuideSettingsError("permission");
+        const changed = previous ? {
+          ...(patch.default_guide !== undefined && patch.default_guide !== effective.default_guide &&
+            { default_guide: patch.default_guide }),
+          ...(patch.max_forward_guides !== undefined && patch.max_forward_guides !== effective.max_forward_guides &&
+            { max_forward_guides: patch.max_forward_guides }),
+        } : patch;
+        if (Object.keys(changed).length &&
+            !await writeGuideFile(join(options.cache, settingsFile), JSON.stringify({ ...current, ...changed }) + "\n", canWrite)) {
+          throw new GuideSettingsError("permission");
+        }
+        return { ...effective, ...changed };
+      } finally {
+        lock.close();
+      }
+    },
+  };
+}
+
 export function createZzzStrategy(options: {
   readonly cache: string;
   readonly legacyResources?: string;
@@ -65,24 +118,10 @@ export function createZzzStrategy(options: {
   readonly collections: ReturnType<typeof createRoleGuideCollections>;
   operation(key: string, update: boolean, load: () => Promise<GuideReply>, error: string): Promise<GuideReply>;
 }) {
-  async function settings(): Promise<Settings> {
-    const [defaults, legacy, current] = await Promise.all([
-      object(options.legacyRoot, "defSet/guide.yaml", Bun.YAML.parse),
-      object(options.legacyRoot, "config/guide.yaml", Bun.YAML.parse),
-      object(options.cache, settingsFile, JSON.parse),
-    ]);
-    return { ...settingsDefaults, ...configValues(defaults), ...configValues(legacy), ...configValues(current) };
-  }
+  const { read: settings, write } = createZzzStrategySettings(options);
 
-  async function set(key: keyof Settings, value: number) {
-    await mkdir(options.cache, { recursive: true, mode: 0o700 });
-    const lock = await lockFile(join(options.cache, ".zzz-strategy.sqlite"), "绝区零攻略设置");
-    try {
-      const current = configValues(await object(options.cache, settingsFile, JSON.parse));
-      await writeGuideFile(join(options.cache, settingsFile), JSON.stringify({ ...current, [key]: value }) + "\n");
-    } finally {
-      lock.close();
-    }
+  function set(key: keyof Settings, value: number) {
+    return write({ [key]: value });
   }
 
   async function canonicalName(query: string) {
