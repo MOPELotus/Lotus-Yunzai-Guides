@@ -1,15 +1,58 @@
 // Reference panels and yield curves are from Mora-Plugin model/roleGuide.js.
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { characterAliasKey, readGameCharacterAliases } from "../../lib/game-character-aliases.ts";
 import type { CommandReply } from "../../lib/commands.ts";
 import type { MessageReply } from "../../lib/messages.ts";
 import { createRoleResourcePack, referenceNotes, type RolePackFallback, type RolePackSnapshot } from "./role-resource-pack.ts";
-import { resolveGuideRole, safeGuideName, type GuideGame } from "./role-guide-input.ts";
+import { guideKey, normalizeStarRailGuideCommand, resolveGuideRole, safeGuideName, type GuideGame } from "./role-guide-input.ts";
+
+import { createOriginalStarRailGuideReader } from "./starrail-guide-history.ts";
 
 const genshinHelp = [
   "角色默认配置：五星0命，四星满命，天赋满级",
   "曲线详细帮助：\n收益曲线说明书：https://www.miyoushe.com/ys/article/28119112\n《属性收益论》：https://www.miyoushe.com/ys/article/34217426\n《属性收益论》附录：https://www.miyoushe.com/ys/article/35015246",
 ];
-const starrailHelp = ["请使用【*希儿参考面板】或【#星铁罗刹参考面板】进行使用"];
+const starrailHelp = [
+  "*希儿参考面板 或 *罗刹参考面板 可查角色配装参考。",
+  "*历史希儿参考面板 可查旧版原图，*参考面板帮助 可查看图例。",
+  "*希儿面板 可查自己的角色面板。",
+];
+
+// Exact filenames from the fixed independent plugin, with old aliases absent from the current role index.
+const history = [
+  ["三月七","三月七.jpg","看板娘,三祁,纠缠之缘,march7th"],
+  ["丹恒","丹恒.jpg","单垣,丹垣,丹桁,danheng"],
+  ["佩拉","佩拉.jpg","配拉,佩啦,冰砂糖,pela"],
+  ["停云","停云.jpg","停运,听云,tingyun"],
+  ["克拉拉","克拉拉.jpg","clara"],
+  ["刃","刃.jpg","ren,刀刃,忍,任,人,仁"],
+  ["姬子","姬子.jpg","himeko"],
+  ["娜塔莎","娜塔莎.jpg","那塔莎,那塔沙,娜塔沙,natasha,渡鸦"],
+  ["布洛妮娅","布洛妮娅.jpg","布诺妮亚,布诺妮娅,bronya"],
+  ["希儿","希儿.jpg","seele"],
+  ["希露瓦","希露瓦.jpg","希录瓦,serval"],
+  ["火主","开拓者•存护.jpg",""],
+  ["物主","开拓者•毁灭.jpg","岩开拓者"],
+  ["彦卿","彦卿.jpg","言情,彦情,言卿,燕青,yanqing"],
+  ["景元","景元.jpg","jingyuan"],
+  ["杰帕德","杰帕德.jpg","gepard"],
+  ["桑博","桑博.jpg","sampo"],
+  ["瓦尔特","瓦尔特.jpg","welt"],
+  ["白露","白露.jpg","龙女,白麓,bailu"],
+  ["素裳","素裳.jpg","sushang"],
+  ["罗刹","罗刹.jpg","罗差,罗莎,落差,螺子,lc,裸查,luocha"],
+  ["艾丝妲","艾丝妲.jpg","爱思达,爱丝妲,爱思妲,爱丝达,艾思达,艾思妲,艾丝达,富婆,asta"],
+  ["虎克","虎克.jpg","胡克,hook"],
+  ["银狼","银狼.jpg","音浪,银浪,隐狼,淫狼,鸭子,小鸭,yinlang"],
+  ["阿兰","阿兰.jpg","alan,阿郎,阿蓝,arlan"],
+  ["青雀","青雀.jpg","青却,卿雀,qingque"],
+  ["驭空","驭空.jpg","俊空,军空,junk,jk,yukong"],
+  ["黑塔","黑塔.jpg","人偶,herta"],
+] as const;
+const historicalFiles = new Map<string, string>(history.map(([name, file]) => [name, file]));
+const historicalAliases = new Map(history.flatMap(([name, , aliases]) =>
+  aliases ? aliases.split(",").map(alias => [alias, name] as const) : []));
 
 function readNotes(bytes: Buffer | undefined, name: string) {
   if (!bytes) return;
@@ -30,6 +73,8 @@ function readNotes(bytes: Buffer | undefined, name: string) {
 
 export function createRoleReferences(options: {
   readonly cache: string;
+  readonly settingsRoot?: URL;
+  readonly fetch?: typeof fetch;
   readonly guidePack?: RolePackFallback;
   readonly guideSnapshot?: RolePackSnapshot;
   readonly guideAutomatic?: boolean;
@@ -43,20 +88,42 @@ export function createRoleReferences(options: {
     upstream: options.guideSource, signal: options.signal,
   });
 
+  const original = createOriginalStarRailGuideReader(options);
+
+  async function historicalReference(name?: string): Promise<CommandReply | undefined> {
+    const file = name === undefined ? "help.jpg" : historicalFiles.get(name);
+    if (!file) return;
+    const bytes = await original(file);
+    if (options.signal?.aborted) return;
+    if (bytes) return [`星铁${name === undefined ? "参考面板图例" : `${name}参考面板`}（旧版历史资料）`, { type: "image", file: bytes }];
+  }
+
   async function help(game: GuideGame): Promise<CommandReply> {
     const files = await pack(game, "帮助", false);
     const text = game === "gs" ? genshinHelp : starrailHelp;
-    if (!files.length) return text.join("\n");
+    if (!files.length) {
+      if (game === "sr") {
+        const archived = await historicalReference();
+        if (Array.isArray(archived)) return [...archived, ...text];
+      }
+      return text.join("\n");
+    }
     return [{ type: "image", file: files[0]!.bytes }, ...text];
   }
 
-  async function reference(game: GuideGame, name: string): Promise<CommandReply> {
+  async function reference(game: GuideGame, name: string, useHistorical = false): Promise<CommandReply | undefined> {
     const files = await pack(game, name, false);
     const toImage = (file: { readonly bytes: Buffer }) => ({ type: "image" as const, file: file.bytes });
     const refs = files.filter((file) => file.source.startsWith("RefStat:") && file.source !== referenceNotes).map(toImage);
     const curves = files.filter((file) => file.source.startsWith("YieldCurve:")).map(toImage);
     const first = refs.shift() ?? curves.shift();
-    if (!first) return `暂无${name}进阶参考捏`;
+    if (!first) {
+      if (useHistorical && game === "sr") {
+        const archived = await historicalReference(name);
+        if (archived !== undefined) return archived;
+      }
+      return `暂无${name}进阶参考捏`;
+    }
     const notes = readNotes(files.find((file) => file.source === referenceNotes)?.bytes, name);
     const heading = [first, ...(notes?.url ? [notes.url] : [])];
     const nodes: MessageReply[] = [
@@ -68,15 +135,41 @@ export function createRoleReferences(options: {
     return [title, ...heading, ...refs, ...(notes?.arti ? [notes.arti] : []), ...curves, ...(notes?.brief ? [notes.brief] : [])];
   }
 
-  return (message: string): CommandReply | Promise<CommandReply> | undefined => {
-    const command = message.trim();
+  function resolveCurrent(game: GuideGame, query: string, onlyHistorical: boolean, useHistorical: boolean) {
+    function answer(role: ReturnType<typeof resolveGuideRole>) {
+      if (typeof role === "string") return role.replaceAll("攻略", game === "sr" ? "参考面板" : "进阶参考");
+      if (role && safeGuideName(role.name)) {
+        if (!onlyHistorical) return reference(game, role.name, useHistorical);
+        return historicalReference(role.name).then(reply => reply ??
+          (options.signal?.aborted ? undefined : `暂无${role.name}的旧版历史参考面板。`));
+      }
+    }
+    const role = resolveGuideRole(query, game);
+    if (role || !useHistorical) return answer(role);
+    async function historicalAlias() {
+      const aliases = options.settingsRoot
+        ? await readGameCharacterAliases("sr", fileURLToPath(options.settingsRoot)) : undefined;
+      const canonical = aliases?.get(characterAliasKey(query)) ?? historicalAliases.get(guideKey(query));
+      return canonical ? answer(resolveGuideRole(canonical, "sr")) : undefined;
+    }
+    return historicalAlias();
+  }
+
+  return (message: string): CommandReply | Promise<CommandReply | undefined> | undefined => {
+    const command = normalizeStarRailGuideCommand(message);
+    if (/^#?星铁参考面板$/u.test(command)) return starrailHelp.join("\n");
+    if (/^#?星铁历史参考面板帮助$/u.test(command)) {
+      return historicalReference().then(reply => reply ?? starrailHelp.join("\n"));
+    }
     const instructions = /^#?(星铁|原神)?(收益曲线|参考面板)帮助$/u.exec(command);
     if (instructions) return help(instructions[1] === "星铁" ? "sr" : "gs");
+    const publicReference = /^#?星铁\s*(历史\s*)?(.+?)\s*参考面板$/u.exec(command);
+    if (publicReference) {
+      const query = publicReference[2]!.trim();
+      if (!query || /\d{9,}|[\p{Cc}\p{Cf}]/u.test(query) || query.length > 60) return;
+      return resolveCurrent("sr", query, !!publicReference[1], true);
+    }
     const match = /^#?(星铁|原神)?(\S+?)(?:参考面板|收益曲线|进阶(?:攻略|参考)?)$/u.exec(command);
-    if (!match?.[2]) return;
-    const game = match[1] === "星铁" ? "sr" : "gs";
-    const role = resolveGuideRole(match[2], game);
-    if (typeof role === "string") return role.replaceAll("攻略", game === "sr" ? "参考面板" : "进阶参考");
-    if (role && safeGuideName(role.name)) return reference(game, role.name);
+    if (match?.[2]) return resolveCurrent(match[1] === "星铁" ? "sr" : "gs", match[2], false, false);
   };
 }

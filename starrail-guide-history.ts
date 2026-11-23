@@ -57,8 +57,10 @@ const entries = new Map<string, Guide>([
   ["商店光锥推荐", { title: "星铁商店光锥推荐（历史资料）", pages: [["gz/商店光锥推荐.jpg", "商店光锥推荐"]] }],
 ]);
 
-export function createStarRailGuideHistory(options: { readonly cache: string; readonly settingsRoot?: URL;
-  readonly signal?: AbortSignal; readonly fetch?: typeof fetch }) {
+type OriginalGuideOptions = { readonly cache: string; readonly settingsRoot?: URL;
+  readonly signal?: AbortSignal; readonly fetch?: typeof fetch };
+
+export function createOriginalStarRailGuideReader(options: OriginalGuideOptions) {
   const { cache, signal } = options;
   const transport = options.fetch ?? fetch;
   const installation = options.settingsRoot && fileURLToPath(options.settingsRoot);
@@ -90,13 +92,21 @@ export function createStarRailGuideHistory(options: { readonly cache: string; re
     if (isGuideImage(bytes)) return bytes;
   }
 
+  return (file: string) => /^(?:[a-z]{2}\/)?[\p{L}\p{N}•-]+\.jpg$/u.test(file)
+    ? cached(join("sr-history-308a83d", file), false, () => download(file), () => original(file)) : Promise.resolve(undefined);
+}
+
+export function createStarRailGuideHistory(options: OriginalGuideOptions) {
+  const { signal } = options;
+  const read = createOriginalStarRailGuideReader(options);
+
   async function render({ title, pages }: Guide): Promise<CommandReply | undefined> {
     const nodes: MessageReply[] = [title];
     const missing: string[] = [];
     for (let start = 0; start < pages.length; start += 5) {
       if (signal?.aborted) return;
       const batch = await Promise.all(pages.slice(start, start + 5).map(async ([file, label]) => {
-        const bytes = await cached(join("sr-history-308a83d", file), false, () => download(file), () => original(file));
+        const bytes = await read(file);
         return { file, label, bytes };
       }));
       for (const { file, label, bytes } of batch) {
