@@ -52,7 +52,7 @@ export async function readGuideAuthors(game: GuideGame, root?: string, settingsR
   return parse(await readFile(new URL(`./collection-defaults/${filename}`, import.meta.url), "utf8"));
 }
 
-async function responseBytes(response: Response, limit: number): Promise<Buffer> {
+export async function responseBytes(response: Response, limit: number): Promise<Buffer> {
   if (!response.ok || !response.body) throw new Error("原攻略来源无响应。");
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -93,8 +93,9 @@ function selectZzzImage(posts: readonly Record<string, unknown>[], name: string)
   }
 }
 
-function selectImage(posts: readonly Record<string, unknown>[], role: GuideRole, structured: boolean): string | undefined {
+function selectImage(posts: readonly Record<string, unknown>[], role: GuideRole, structured: boolean, byHeight = false): string | undefined {
   const name = guideKey(role.name);
+  const form = byHeight && name.startsWith("开拓者·") ? name.slice(4) : undefined;
   const terms = (role.topicWords ?? []).map(guideKey);
   const otherForms = (role.otherForms ?? []).map(guideKey);
   let topicImage: string | undefined;
@@ -117,8 +118,10 @@ function selectImage(posts: readonly Record<string, unknown>[], role: GuideRole,
     }
     const title = typeof post.subject === "string" ? guideKey(post.subject) : "";
     if (otherForms.some((form) => title.includes(form) || title.includes(form.replace(/·/gu, "")))) continue;
-    const largest = [...images].sort((a, b) => Number(b.size ?? 0) - Number(a.size ?? 0)).map(url).find(Boolean);
-    if (largest && (title.includes(name) || terms.some((term) => title.includes(term)))) return largest;
+    const dimension = byHeight ? "height" : "size";
+    const largest = [...images].sort((a, b) => Number(b[dimension] ?? 0) - Number(a[dimension] ?? 0)).map(url).find(Boolean);
+    if (largest && (title.includes(name) || (form && title.includes("开拓者") && title.includes(form)) ||
+      terms.some(term => title.includes(term)))) return largest;
     if (!topicImage && !terms.length && objects(row.topics).some((topic) => typeof topic.name === "string" && guideKey(topic.name) === name)) {
       topicImage = largest;
     }
@@ -151,14 +154,13 @@ export function createRoleGuideCollections(options: {
     });
     return response;
   }
-  function posts(id: number, refresh: boolean, zzz: boolean): Promise<readonly Record<string, unknown>[]> {
-    const gid = zzz ? "8" : "2";
+  function posts(id: number, refresh: boolean, gid: "2" | "6" | "8"): Promise<readonly Record<string, unknown>[]> {
     const key = `${gid}/${id}`;
     const existing = reads.get(key);
     if (existing && (existing.pending || (!refresh && now() - existing.time < 120_000))) return existing.posts;
     const url = new URL(collectionUrl);
     url.searchParams.set("gids", gid);
-    if (!zzz) url.searchParams.set("order_type", "2");
+    if (gid !== "8") url.searchParams.set("order_type", "2");
     url.searchParams.set("collection_id", String(id));
     const requestPosts = (async () => {
       const result = object(JSON.parse((await responseBytes(await request(url, 30_000), 24 * 1024 * 1024)).toString("utf8")));
@@ -190,17 +192,20 @@ export function createRoleGuideCollections(options: {
 
   return {
     authors: (game: GuideGame) => readGuideAuthors(game, options.config, options.settingsRoot),
-    async image(role: GuideRole, author: Author, refresh = false, numbered?: "gs" | "zzz"): Promise<Buffer | undefined> {
+    async image(role: GuideRole, author: Author, refresh = false, numbered?: GuideGame): Promise<Buffer | undefined> {
       try {
         const zzz = numbered === "zzz";
-        const batches = await Promise.all(author.collection_id.map((id) => posts(id, refresh, zzz)));
-        const url = zzz ? selectZzzImage(batches.flat(), role.name) : selectImage(batches.flat(), role, author.collection_id.includes(341523));
+        const gid = zzz ? "8" : numbered === "sr" ? "6" : "2";
+        const batches = await Promise.all(author.collection_id.map(id => posts(id, refresh, gid)));
+        const postsInOrder = batches.flat();
+        const url = zzz ? selectZzzImage(postsInOrder, role.name)
+          : selectImage(postsInOrder, role, author.collection_id.includes(341523), numbered === "sr");
         if (url) return await downloadImage(url, zzz ? zzzImageProcess : numbered ? legacyImageProcess : undefined);
       } catch {}
     },
     async materialImage(id: number, name: string, refresh: boolean, field: "image_list" | "post.images", index: number) {
       try {
-        for (const row of await posts(id, refresh, false)) {
+        for (const row of await posts(id, refresh, "2")) {
           const post = object(row.post);
           if (typeof post.subject !== "string" || !post.subject.includes(name)) continue;
           const url = field === "image_list" ? objects(row.image_list)[index]?.url

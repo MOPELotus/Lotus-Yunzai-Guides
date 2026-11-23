@@ -84,7 +84,9 @@ export function createGuidesModule(options: {
       if (banners !== undefined) return banners;
       const abyss = options.akashaAbyss?.(command, inlineImageByteLimit) ?? options.abyssReferences?.(command);
       if (abyss !== undefined) return abyss;
-      const roleGuide = options.roleReferences?.(command) ?? options.roleGuides?.(command, isMaster);
+      const owner = isMaster && !context.isDelegated;
+      const roleGuide = await (options.roleReferences?.(command) ?? options.roleGuides?.(command, owner,
+        () => owner && typeof context.user_id === "number" && context.isBotMaster(context.user_id)));
       if (roleGuide !== undefined) return roleGuide;
       const roleMaterial = options.roleMaterials?.(command, inlineImageByteLimit);
       if (roleMaterial !== undefined) return roleMaterial;

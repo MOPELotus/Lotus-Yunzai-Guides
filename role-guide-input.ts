@@ -83,9 +83,16 @@ export function resolveGuideRole(query: string, game: GuideGame): GuideRole | st
   return { name: input };
 }
 
+export function normalizeStarRailGuideCommand(message: string) {
+  return message.trim().replace(/^(?:#星铁sr|#?(?:[*＊]?sr|[*＊]))/u, "#星铁");
+}
+
 export function parseGuideCommand(command: string): { readonly game: GuideGame; readonly role: string;
   readonly update: boolean; readonly source?: number } | undefined {
-  const input = command.trim();
+  const input = normalizeStarRailGuideCommand(command);
+  const starRail = /^#?星铁(更新)?(\S+?)攻略([0-3]|all)$/iu.exec(input);
+  if (starRail) return { game: "sr", role: starRail[2]!, update: !!starRail[1],
+    source: starRail[3]!.toLowerCase() === "all" ? 0 : Number(starRail[3]) };
   const numbered = /^#?(?:原神)?(更新)?(\S+?)攻略([1-7])$/u.exec(input);
   if (numbered && !/^(?:星铁|绝区零)/u.test(numbered[2]!)) {
     return { game: "gs", role: numbered[2]!, update: !!numbered[1], source: Number(numbered[3]) };

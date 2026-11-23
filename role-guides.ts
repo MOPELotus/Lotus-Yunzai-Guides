@@ -1,12 +1,16 @@
 // Source precedence and legacy cache layout are from Mora-Plugin model/roleGuide.js.
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { characterAliasKey, readGameCharacterAliases } from "../../lib/game-character-aliases.ts";
 import type { CommandReply } from "../../lib/commands.ts";
 import { createGenshinStrategyPreference, genshinStrategyHelp, genshinStrategyNumber, genshinStrategySource } from "./genshin-strategy.ts";
 import { createRoleGuideCollections } from "./role-guide-collections.ts";
 import { createRoleGuideCache } from "./role-guide-cache.ts";
 import { createRoleResourcePack, type RolePackFallback, type RolePackSnapshot } from "./role-resource-pack.ts";
-import { guideGames, parseGuideCommand, resolveGuideRole, safeGuideName, type GuideGame, type GuideRole } from "./role-guide-input.ts";
+import { guideGames, normalizeStarRailGuideCommand, parseGuideCommand, resolveGuideRole, safeGuideName, type GuideGame, type GuideRole } from "./role-guide-input.ts";
 import { findGuidePack, readGuideImage, type GuideImage } from "./role-image-files.ts";
+import { createStarRailGuideHistory } from "./starrail-guide-history.ts";
+import { createStarRailStrategy } from "./starrail-strategy.ts";
 import { createZzzStrategy } from "./zzz-strategy.ts";
 
 export function createRoleGuides(options: {
@@ -54,6 +58,8 @@ export function createRoleGuides(options: {
     return result as Promise<Reply | string>;
   }
 
+  const starRail = createStarRailStrategy({ ...options, collections, readCollectionImage });
+  const starRailHistory = createStarRailGuideHistory(options);
   const zzz = createZzzStrategy({ cache: options.cache, legacyRoot: options.legacyZzzRoot,
     legacyResources: options.legacyZzzResources, archivedResources: options.archivedZzzResources,
     archivedRoot: options.archivedZzzResources ? dirname(options.archivedZzzResources) : undefined,
@@ -137,10 +143,12 @@ export function createRoleGuides(options: {
     return options.forward === false ? [title, ...result] : { type: "forward", nodes: [title, ...result] };
   }
 
-  return (message: string, isMaster = false): CommandReply | Promise<CommandReply> | undefined => {
-    const input = message.trim();
+  return (message: string, isMaster = false, canManage = () => isMaster): CommandReply | Promise<CommandReply | undefined> | undefined => {
+    const input = normalizeStarRailGuideCommand(message);
     const zzzCommand = zzz.command(input, isMaster);
     if (zzzCommand !== undefined) return zzzCommand;
+    const starRailCommand = starRail.command(input, canManage) ?? starRailHistory(input);
+    if (starRailCommand !== undefined) return starRailCommand;
     if (/^#?(?:原神)?攻略(?:帮助|说明)?$/u.test(input)) return genshinStrategyHelp;
     const setting = /^#?(?:原神)?设置默认攻略([1-7])?$/u.exec(input);
     if (setting) {
@@ -150,18 +158,29 @@ export function createRoleGuides(options: {
       return preference.set(source).then(() => `已设置默认攻略来源 ${source}（${genshinStrategySource(source)!.source}）。`,
         () => "保存默认攻略来源失败，请稍后再试。");
     }
-    const command = parseGuideCommand(message);
+    const command = parseGuideCommand(input);
     if (!command) return;
-    const role = resolveGuideRole(command.role, command.game);
-    if (!role) return;
-    if (typeof role === "string") {
-      return command.source ? role.replace(/([风岩雷草水火冰]主攻略)(?=、|$)/gu, `$1${command.source}`) : role;
+    const { game, source, update } = command;
+    function answer(role: ReturnType<typeof resolveGuideRole>): CommandReply | Promise<CommandReply | undefined> | undefined {
+      if (!role) return;
+      if (typeof role === "string") {
+        return source === undefined ? role : role.replace(/((?:虚数|[风岩雷草水火冰物])主攻略)(?=、|$)/gu, `$1${source}`);
+      }
+      if (!safeGuideName(role.name)) return;
+      if (source !== undefined) return game === "sr" ? starRail.lookup(role, source, update) : numberedLookup(role, source, update);
+      const withPreference = input.endsWith("攻略");
+      const fallbackPreference = game !== "sr" && withPreference;
+      const standard = () => operation(`${game}/${role.name}/${fallbackPreference ? "strategy" : "guide"}`, update,
+        () => lookup(game, role, update, fallbackPreference),
+        `暂时无法取得${role.name}的${guideGames[game].label}攻略。`);
+      return game === "sr" && withPreference ? starRail.defaultSource().then(preferred =>
+        preferred === undefined ? standard() : starRail.lookup(role, preferred, update)) : standard();
     }
-    if (!safeGuideName(role.name)) return;
-    if (command.source) return numberedLookup(role, command.source, command.update);
-    const useDefault = command.game !== "sr" && input.endsWith("攻略");
-    return operation(`${command.game}/${role.name}/${useDefault ? "strategy" : "guide"}`, command.update,
-      () => lookup(command.game, role, command.update, useDefault),
-      `暂时无法取得${role.name}的${guideGames[command.game].label}攻略。`);
+    const role = resolveGuideRole(command.role, game);
+    if (role || game !== "sr" || !options.settingsRoot) return answer(role);
+    return readGameCharacterAliases("sr", fileURLToPath(options.settingsRoot)).then(aliases => {
+      const canonical = aliases.get(characterAliasKey(command.role));
+      return answer(canonical ? resolveGuideRole(canonical, game) : undefined);
+    });
   };
 }
