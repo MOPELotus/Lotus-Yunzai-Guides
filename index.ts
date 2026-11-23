@@ -11,6 +11,7 @@ import { createRoleReferences } from "./role-references.ts";
 import { createOriginalRoleResources } from "./original-role-resources.ts";
 import { createBannerTables } from "./banner-tables.ts";
 import { createAbyssReferences } from "./abyss-references.ts";
+import { createAkashaAbyss } from "./akasha-abyss.ts";
 import { createGenshinCalendar, createStarrailCalendar, createZzzCalendar } from "./calendar.ts";
 import { createCalendarSchedule, type CalendarSchedule, type CalendarScheduleOptions } from "./calendar-schedule.ts";
 import { guideFlags, readGuidesConfiguration } from "./guide-configuration.ts";
@@ -29,6 +30,7 @@ export function createGuidesModule(options: {
   readonly zzzCalendar?: ReturnType<typeof createZzzCalendar>;
   readonly bannerTables?: ReturnType<typeof createBannerTables>;
   readonly abyssReferences?: ReturnType<typeof createAbyssReferences>;
+  readonly akashaAbyss?: ReturnType<typeof createAkashaAbyss>;
 }): CommandModule {
   const { resources } = options;
   const refresh = (force: boolean) => async (argument: string, { isMaster }: { isMaster: boolean }) => {
@@ -54,7 +56,7 @@ export function createGuidesModule(options: {
       if (calendar !== undefined) return calendar;
       const banners = options.bannerTables?.(command);
       if (banners !== undefined) return banners;
-      const abyss = options.abyssReferences?.(command);
+      const abyss = options.akashaAbyss?.(command, inlineImageByteLimit) ?? options.abyssReferences?.(command);
       if (abyss !== undefined) return abyss;
       const roleGuide = options.roleReferences?.(command) ?? options.roleGuides?.(command, isMaster);
       if (roleGuide !== undefined) return roleGuide;
@@ -150,6 +152,9 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
   const abyssResources = createOriginalRoleResources({ root: data("../../data/guides/abyss-reference-origin/"),
     cache, fallbacks: guidePack, signal: refreshSignal, scope: "abyss" });
   const abyssReferences = createAbyssReferences(abyssResources, guidePack, forward);
+  const akashaAbyss = createAkashaAbyss({ signal: refreshSignal, themes: [
+    data("../../backup/plugins/mora-plugin/resources/"), data("../mora-plugin/resources/"),
+  ] });
   const legacyZzzResources = Bun.env.LOTUS_ZZZ_LEGACY_RESOURCES_DIR?.trim() || data("../ZZZ-Plugin/resources/");
   const guideOptions = {
     cache,
@@ -204,7 +209,7 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
   });
   return {
     ...createGuidesModule({ directory: directory ?? legacyDirectory, forward, resources, roleGuides, roleReferences, roleMaterials,
-      starrailCalendar, genshinCalendar, zzzCalendar, bannerTables, abyssReferences }),
+      starrailCalendar, genshinCalendar, zzzCalendar, bannerTables, abyssReferences, akashaAbyss }),
     async dispose() {
       controller.abort();
       if (cancelStart) cancelStart();
