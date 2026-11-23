@@ -4,7 +4,8 @@ import { loadImage, type CanvasRenderingContext2D as Context, type Image } from 
 type Caption = { readonly lead: string; readonly label: string; readonly meta: string; readonly history?: string };
 
 export type AkashaCard = Caption & (
-  | { readonly type: "usage"; readonly characters: readonly { readonly name: string; readonly rarity: number; readonly rate: number }[] }
+  | { readonly type: "usage"; readonly characters: readonly { readonly name: string; readonly portraitName?: string;
+    readonly rarity: number; readonly rate: number }[] }
   | { readonly type: "teams"; readonly page: number; readonly pageCount: number; readonly teams: readonly {
     readonly names: readonly string[]; readonly count: number; readonly full: number; readonly ratio: string;
   }[] }
@@ -42,12 +43,14 @@ export async function drawAkashaCard(card: AkashaCard, readImage: ReadImage, mod
     const bytes = await readImage(path, fixed);
     if (bytes) return loadImage(bytes).catch(() => undefined);
   }
-  const names = new Set(card.type === "usage" ? card.characters.map(row => row.name) : card.teams.flatMap(row => row.names));
+  const names = new Map(card.type === "usage"
+    ? card.characters.map(row => [row.name, row.portraitName ?? row.name] as const)
+    : card.teams.flatMap(row => row.names.map(name => [name, name] as const)));
   const [background, separators, portraitEntries] = await Promise.all([
     read(`img/background/${card.type === "usage" ? "AbyssUR_bg" : "AbyssTeams_bg"}.webp`, true),
     Promise.all((card.type === "usage" ? usageSeparators : ["team_split"])
       .map(name => read(`img/separator/${name}.png`, true))),
-    Promise.all([...names].map(async name => [name, await read(`img/role/${name}.png`, false)] as const)),
+    Promise.all([...names].map(async ([name, filename]) => [name, await read(`img/role/${filename}.png`, false)] as const)),
   ]);
   const portraits = new Map(portraitEntries);
   const width = card.type === "usage" ? 2667 : 1500;

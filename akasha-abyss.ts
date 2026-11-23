@@ -1,5 +1,6 @@
 import type { MessageSegment } from "../../lib/messages.ts";
 import type { AkashaCard, drawAkashaCard } from "./akasha-card.ts";
+import { resolveGuideRole } from "./role-guide-input.ts";
 import { isGuideImage, readGuideImage } from "./role-image-files.ts";
 
 const origin = "https://akashadata.com";
@@ -19,7 +20,7 @@ const helpText = [
 
 type Row = Record<string, unknown>;
 type Transport = (url: string, options: RequestInit & { readonly proxy?: false }) => Promise<Response>;
-type Character = { readonly name: string; readonly rarity: number; readonly rate: number };
+type Character = { readonly name: string; readonly portraitName?: string; readonly rarity: number; readonly rate: number };
 type Team = { readonly names: readonly string[]; readonly count: number; readonly full: number; readonly ratio: string };
 type Half = "全部" | "上半" | "下半";
 type Query =
@@ -77,7 +78,10 @@ function snapshot(total: Buffer, dictionary: Buffer) {
   const characters: readonly Character[] = rows(data.character_used_list).map(character => {
     const rarity = number(character.rarity, 5, true);
     if (rarity !== 4 && rarity !== 5) throw new TypeError("虚空榜单的角色星级无效。");
-    return { name: string(character.name, characterName), rarity, rate: number(character.value, 100) };
+    const name = string(character.name, characterName);
+    const role = resolveGuideRole(name, "gs");
+    return { name, portraitName: typeof role === "object" && role.name !== name ? role.name : undefined,
+      rarity, rate: number(character.value, 100) };
   });
   function teams(field: string, count: string, full: string): readonly Team[] {
     return rows(data[field]).map(team => {

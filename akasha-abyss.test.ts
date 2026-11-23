@@ -76,3 +76,28 @@ test("只解析 JSON 赋值并共用刷新，坏快照保留上版，撤销后�
   expect(await handler("#虚空深渊帮助")).toBeUndefined();
   expect(calls).toBe(4);
 });
+
+test("使用率用正式名称查简称头像，保留可见名称、未知名称与队伍字典", async () => {
+  const names = ["心海", "平藏", "珊瑚宫心海", "天水", "旅行者"];
+  const dictionary = { "1": { name: "心海" }, "2": { name: "月影" } };
+  const cards: AkashaCard[] = [];
+  const handler = createAkashaAbyss({
+    signal: new AbortController().signal,
+    transport: async url => String(url).endsWith("/abyss_total.js")
+      ? response("static_abyss_total", { ...source,
+        character_used_list: names.map(name => ({ name, rarity: 5, value: 50 })),
+      })
+      : response("static_card_dict", dictionary),
+    draw: async card => { cards.push(card); throw new Error("用于文本回退"); },
+  });
+
+  await handler("#虚空深渊使用率");
+  expect(cards[0]).toMatchObject({ type: "usage", characters: [
+    { name: "心海", portraitName: "珊瑚宫心海" }, { name: "平藏", portraitName: "鹿野院平藏" },
+    ...["珊瑚宫心海", "天水", "旅行者"].map(name => ({ name, portraitName: undefined })),
+  ] });
+  await handler("#虚空深渊上半队伍");
+  expect(cards[1]).toMatchObject({ type: "teams", teams: expect.arrayContaining([{ names: ["心海", "月影"],
+    count: 19, full: 40, ratio: "63:37",
+  }]) });
+});
