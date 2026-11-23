@@ -6,6 +6,7 @@ import { isGuideImage, roleImageLimit } from "./role-image-files.ts";
 import { configuredGuideCollection } from "./guide-configuration.ts";
 
 type Author = { readonly source: string; readonly collection_id: readonly number[] };
+export type GuideFetch = (url: URL, init: RequestInit) => Promise<Response>;
 
 function object(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -74,6 +75,7 @@ const collectionUrl = "https://bbs-api.mihoyo.com/post/wapi/getPostFullInCollect
 const imageHosts = new Set(["upload-bbs.miyoushe.com", "upload-bbs.mihoyo.com"]);
 const legacyImageProcess = "image//resize,s_1200/quality,q_90/auto-orient,0/interlace,1/format,jpg";
 const zzzImageProcess = "image/resize,s_1200/quality,q_90/auto-orient,0/interlace,1/format,jpg";
+const materialImageProcess = "image//resize,s_1000/quality,q_80/auto-orient,0/interlace,1/format,jpg";
 
 function selectZzzImage(posts: readonly Record<string, unknown>[], name: string): string | undefined {
   const keyword = name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/gu, "");
@@ -127,7 +129,7 @@ function selectImage(posts: readonly Record<string, unknown>[], role: GuideRole,
 export function createRoleGuideCollections(options: {
   readonly config?: string;
   readonly settingsRoot?: URL;
-  readonly fetch?: typeof fetch;
+  readonly fetch?: GuideFetch;
   readonly signal?: AbortSignal;
 }) {
   const transport = options.fetch ?? fetch;
@@ -176,6 +178,14 @@ export function createRoleGuideCollections(options: {
     return reading.posts;
   }
 
+  async function downloadImage(url: string, process?: string): Promise<Buffer | undefined> {
+    const source = new URL(url);
+    if (source.protocol !== "https:" || source.username || source.password || source.port || !imageHosts.has(source.hostname)) return;
+    if (process) source.searchParams.set("x-oss-process", process);
+    const bytes = await responseBytes(await request(source, 25_000), roleImageLimit);
+    if (isGuideImage(bytes)) return bytes;
+  }
+
   return {
     authors: (game: GuideGame) => readGuideAuthors(game, options.config, options.settingsRoot),
     async image(role: GuideRole, author: Author, refresh = false, numbered?: "gs" | "zzz"): Promise<Buffer | undefined> {
@@ -183,12 +193,21 @@ export function createRoleGuideCollections(options: {
         const zzz = numbered === "zzz";
         const batches = await Promise.all(author.collection_id.map((id) => posts(id, refresh, zzz)));
         const url = zzz ? selectZzzImage(batches.flat(), role.name) : selectImage(batches.flat(), role, author.collection_id.includes(341523));
-        if (!url) return;
-        const source = new URL(url);
-        if (source.protocol !== "https:" || source.username || source.password || source.port || !imageHosts.has(source.hostname)) return;
-        if (numbered) source.searchParams.set("x-oss-process", zzz ? zzzImageProcess : legacyImageProcess);
-        const bytes = await responseBytes(await request(source, 25_000), roleImageLimit);
-        if (isGuideImage(bytes)) return bytes;
+        if (url) return await downloadImage(url, zzz ? zzzImageProcess : numbered ? legacyImageProcess : undefined);
+      } catch {}
+    },
+    async materialImage(id: number, name: string, refresh: boolean, field: "image_list" | "post.images", index: number) {
+      try {
+        for (const row of await posts(id, refresh, false)) {
+          const post = object(row.post);
+          if (typeof post.subject !== "string" || !post.subject.includes(name)) continue;
+          const url = field === "image_list" ? objects(row.image_list)[index]?.url
+            : Array.isArray(post.images) ? post.images[index] : undefined;
+          if (typeof url === "string") {
+            const bytes = await downloadImage(url, materialImageProcess);
+            if (bytes) return bytes;
+          }
+        }
       } catch {}
     },
   };

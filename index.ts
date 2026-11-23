@@ -6,6 +6,7 @@ import type { MessageSegment } from "../../lib/messages.ts";
 import { teamGuides } from "./team-guides.ts";
 import { createTeamResources } from "./team-resources.ts";
 import { createRoleGuides } from "./role-guides.ts";
+import { createRoleMaterials } from "./role-materials.ts";
 import { createRoleReferences } from "./role-references.ts";
 import { createOriginalRoleResources } from "./original-role-resources.ts";
 import { createBannerTables } from "./banner-tables.ts";
@@ -21,6 +22,7 @@ export function createGuidesModule(options: {
   readonly forward?: boolean;
   readonly resources?: TeamResources;
   readonly roleGuides?: ReturnType<typeof createRoleGuides>;
+  readonly roleMaterials?: ReturnType<typeof createRoleMaterials>;
   readonly roleReferences?: ReturnType<typeof createRoleReferences>;
   readonly starrailCalendar?: ReturnType<typeof createStarrailCalendar>;
   readonly genshinCalendar?: ReturnType<typeof createGenshinCalendar>;
@@ -46,7 +48,7 @@ export function createGuidesModule(options: {
       "#更新配队资源": refresh(false),
       "#强制更新配队资源": refresh(true),
     },
-    async fallback(message, { normalizedMessage, isMaster }) {
+    async fallback(message, { normalizedMessage, isMaster, inlineImageByteLimit }) {
       const command = normalizedMessage || message;
       const calendar = options.genshinCalendar?.(command) ?? options.starrailCalendar?.(command) ?? options.zzzCalendar?.(command);
       if (calendar !== undefined) return calendar;
@@ -56,6 +58,8 @@ export function createGuidesModule(options: {
       if (abyss !== undefined) return abyss;
       const roleGuide = options.roleReferences?.(command) ?? options.roleGuides?.(command, isMaster);
       if (roleGuide !== undefined) return roleGuide;
+      const roleMaterial = options.roleMaterials?.(command, inlineImageByteLimit);
+      if (roleMaterial !== undefined) return roleMaterial;
       if (/^#(?:星铁|绝区零)/u.test(command)) return;
       const query = /^#(\S+)配队$/u.exec(command)?.[1];
       if (!query || query.includes("深渊")) return;
@@ -162,6 +166,8 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
     signal: refreshSignal, forward,
   };
   const roleGuides = createRoleGuides(guideOptions);
+  const roleMaterials = createRoleMaterials({ cache: data("../../data/guides/material/"),
+    legacy: data("../../temp/material/"), signal: refreshSignal });
   const roleReferences = createRoleReferences(guideOptions);
   const starrailCalendar = createStarrailCalendar({ signal: refreshSignal });
   const genshinCalendar = createGenshinCalendar({ signal: refreshSignal });
@@ -197,7 +203,7 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
     stopAbyss = startResourceRefresh(abyssResources, refreshSignal, "abyss-reference", "深渊参考图资源");
   });
   return {
-    ...createGuidesModule({ directory: directory ?? legacyDirectory, forward, resources, roleGuides, roleReferences,
+    ...createGuidesModule({ directory: directory ?? legacyDirectory, forward, resources, roleGuides, roleReferences, roleMaterials,
       starrailCalendar, genshinCalendar, zzzCalendar, bannerTables, abyssReferences }),
     async dispose() {
       controller.abort();
