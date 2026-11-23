@@ -18,6 +18,40 @@ function git(cwd: string, ...args: string[]) {
   if (result.exitCode) throw new Error(result.stderr.toString());
 }
 
+test("攻略使用归档中的用户图与绝区零编号图，当前覆盖优先且归档只读", async () => {
+  const root = await mkdtemp(join(tmpdir(), "lotus-archived-role-guides-"));
+  async function put(path: string, value: string | Buffer) {
+    const file = join(root, path);
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, value);
+  }
+  try {
+    const aliases = "艾莲: [旧鲨鱼别名]\n";
+    const archivedMora = "backup/plugins/mora-plugin/data/roleGuides/add_ons";
+    const archivedZzz = "backup/plugins/ZZZ-Plugin";
+    await put(`${archivedMora}/作者/钟离.jpg`, image("归档攻略"));
+    await put("config/roleGuides.yaml", "news: []\nolds: []\n");
+    await put("data/role/mora/Genshin/钟离/index.json", JSON.stringify({ checkedAt: Date.now(), files: [] }));
+    await put(`${archivedZzz}/config/alias.yaml`, aliases);
+    const zzzImage = `${archivedZzz}/resources/images/guides/新艾利都快讯/role_guide_艾莲.png`;
+    await put(zzzImage, image("归档一号"));
+    const offline = (async () => { throw new Error("不应访问原站"); }) as typeof fetch;
+    const search = createRoleGuides({
+      cache: join(root, "data/role"), config: join(root, "config"), guideAutomatic: false,
+      legacyAddOns: join(root, archivedMora), archivedZzzResources: join(root, archivedZzz, "resources"),
+      fetch: offline,
+    });
+    expect(await search("#钟离攻略")).toEqual(part("归档攻略"));
+    expect(await search("%旧鲨鱼别名攻略1")).toEqual(part("归档一号"));
+    await put("data/role/add_ons/作者/钟离.jpg", image("本地覆盖"));
+    expect(await search("#钟离攻略")).toEqual(part("本地覆盖"));
+    expect(await readFile(join(root, zzzImage))).toEqual(image("归档一号"));
+    expect(await readFile(join(root, archivedZzz, "config/alias.yaml"), "utf8")).toBe(aliases);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("三游戏保留旧攻略命令、配置源、本地覆盖及旧 Atlas，更新失败退回已有原图", async () => {
   expect(resolveGuideRole("喵喵", "gs")).toMatchObject({ name: "迪奥娜", id: "10000039" });
   const root = await mkdtemp(join(tmpdir(), "lotus-role-guides-test-"));

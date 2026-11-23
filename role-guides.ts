@@ -1,5 +1,5 @@
 // Source precedence and legacy cache layout are from Mora-Plugin model/roleGuide.js.
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { CommandReply } from "../../lib/commands.ts";
 import { createGenshinStrategyPreference, genshinStrategyHelp, genshinStrategyNumber, genshinStrategySource } from "./genshin-strategy.ts";
 import { createRoleGuideCollections } from "./role-guide-collections.ts";
@@ -12,9 +12,11 @@ import { createZzzStrategy } from "./zzz-strategy.ts";
 export function createRoleGuides(options: {
   readonly cache: string;
   readonly legacyStrategies?: readonly string[];
+  readonly legacyAddOns?: string;
   readonly legacyStrategySettings?: string;
   readonly legacyZzzResources?: string;
   readonly legacyZzzRoot?: string;
+  readonly archivedZzzResources?: string;
   readonly atlas?: string;
   readonly config?: string;
   readonly settingsRoot?: URL;
@@ -53,7 +55,9 @@ export function createRoleGuides(options: {
   }
 
   const zzz = createZzzStrategy({ cache: options.cache, legacyRoot: options.legacyZzzRoot,
-    legacyResources: options.legacyZzzResources, collections, readCollectionImage, operation });
+    legacyResources: options.legacyZzzResources, archivedResources: options.archivedZzzResources,
+    archivedRoot: options.archivedZzzResources ? dirname(options.archivedZzzResources) : undefined,
+    collections, readCollectionImage, operation });
 
   async function legacyImage(source: number, filename: string) {
     for (const directory of options.legacyStrategies ?? []) {
@@ -91,12 +95,13 @@ export function createRoleGuides(options: {
   async function lookup(game: GuideGame, role: GuideRole, update: boolean, useDefault: boolean): Promise<CommandReply> {
     const gamePath = guideGames[game];
     const suffix = game === "gs" ? "" : gamePath.pack;
-    const [configured, assets, overrides, atlas] = await Promise.all([
+    const [configured, assets, local, archived, atlas] = await Promise.all([
       collections.authors(game), rolePack(game, role.name, update),
       findGuidePack(join(options.cache, "add_ons"), role.name, suffix),
+      findGuidePack(options.legacyAddOns, role.name, suffix),
       fromAtlas(game, role.name, role.id),
     ]);
-    const overrideMap = new Map(overrides.map((image) => [image.source, image]));
+    const overrideMap = new Map([...archived, ...local].map((image) => [image.source, image]));
     const packedNames = new Set(assets.map((image) => image.source));
     const images: GuideImage[] = assets.map((image) => overrideMap.get(image.source) ?? image);
     if (atlas && !packedNames.has(atlas.source)) images.push(overrideMap.get(atlas.source) ?? atlas);
@@ -116,7 +121,7 @@ export function createRoleGuides(options: {
       if (bytes) return { source: author.source, bytes };
     }));
     for (const image of fromCollections) if (image) images.push(image);
-    images.push(...overrides);
+    images.push(...overrideMap.values());
     const reply = new Map<string, { type: "image"; file: Buffer }>();
     for (const { source, bytes } of images) {
       if (!reply.has(source)) reply.set(source, { type: "image", file: bytes });

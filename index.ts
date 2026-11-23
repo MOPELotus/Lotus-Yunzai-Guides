@@ -168,7 +168,7 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
   const configuredPack = Bun.env.LOTUS_GUIDES_MORA_PACK_DIR?.trim();
   const guideAutomatic = !!guidesSchedule && autoUpdate;
   const guidePack = configuredPack ? [configuredPack] : [data("../../data/guides/mora-plugin-res/"),
-    data("../mora-plugin/resources/mora-plugin-res/")];
+    data("../mora-plugin/resources/mora-plugin-res/"), data("../../backup/plugins/mora-plugin/resources/mora-plugin-res/")];
   const original = createOriginalRoleResources({ root: data("../../data/guides/role-origin/"),
     cache, fallbacks: guidePack, signal: refreshSignal });
   const bannerResources = createOriginalRoleResources({ root: data("../../data/guides/banner-origin/"),
@@ -180,7 +180,8 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
   const akashaAbyss = createAkashaAbyss({ signal: refreshSignal, themes: [
     data("../../backup/plugins/mora-plugin/resources/"), data("../mora-plugin/resources/"),
   ] });
-  const legacyZzzResources = Bun.env.LOTUS_ZZZ_LEGACY_RESOURCES_DIR?.trim() || data("../ZZZ-Plugin/resources/");
+  const configuredZzzResources = Bun.env.LOTUS_ZZZ_LEGACY_RESOURCES_DIR?.trim();
+  const legacyZzzResources = configuredZzzResources || data("../ZZZ-Plugin/resources/");
   const guideOptions = {
     cache,
     config: Bun.env.LOTUS_GUIDES_ROLE_CONFIG_DIR?.trim() || data("../../config/guides/"),
@@ -190,9 +191,11 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
     guideSnapshot: original.current,
     guideAutomatic,
     legacyStrategies: [data("../../temp/strategy/"), data("../../data/strategy/")],
+    legacyAddOns: data("../../backup/plugins/mora-plugin/data/roleGuides/add_ons/"),
     legacyStrategySettings: data("../genshin/config/mys.set.yaml"),
     legacyZzzResources,
     legacyZzzRoot: dirname(legacyZzzResources),
+    archivedZzzResources: configuredZzzResources ? undefined : data("../../backup/plugins/ZZZ-Plugin/resources/"),
     signal: refreshSignal, forward,
   };
   const roleGuides = createRoleGuides(guideOptions);

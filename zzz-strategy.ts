@@ -116,6 +116,8 @@ export function createZzzStrategy(options: {
   readonly cache: string;
   readonly legacyResources?: string;
   readonly legacyRoot?: string;
+  readonly archivedResources?: string;
+  readonly archivedRoot?: string;
   readonly collections: ReturnType<typeof createRoleGuideCollections>;
   readonly readCollectionImage: ReturnType<typeof createRoleGuideCache>;
   operation(key: string, update: boolean, load: () => Promise<GuideReply>, error: string): Promise<GuideReply>;
@@ -128,11 +130,13 @@ export function createZzzStrategy(options: {
 
   async function canonicalName(query: string) {
     const key = guideKey(query);
-    for (const file of ["config/alias.yaml", "defSet/alias.yaml"]) {
-      const aliases = await object(options.legacyRoot, file, Bun.YAML.parse);
-      for (const [name, names] of Object.entries(aliases)) {
-        if (safeGuideName(name) && (guideKey(name) === key || Array.isArray(names) &&
-          names.some((alias) => typeof alias === "string" && guideKey(alias) === key))) return name;
+    for (const root of [options.legacyRoot, options.archivedRoot]) {
+      for (const file of ["config/alias.yaml", "defSet/alias.yaml"]) {
+        const aliases = await object(root, file, Bun.YAML.parse);
+        for (const [name, names] of Object.entries(aliases)) {
+          if (safeGuideName(name) && (guideKey(name) === key || Array.isArray(names) &&
+            names.some((alias) => typeof alias === "string" && guideKey(alias) === key))) return name;
+        }
       }
     }
     return query;
@@ -146,7 +150,12 @@ export function createZzzStrategy(options: {
       const local = join("numbered", "ZenlessZoneZero", author.source, filename);
       const bytes = await options.readCollectionImage(local, update,
         () => options.collections.image({ name }, author, update, "zzz"), async () => {
-          if (options.legacyResources) return readGuideImage(options.legacyResources, join("images", "guides", author.source, filename));
+          const path = join("images", "guides", author.source, filename);
+          for (const root of [options.legacyResources, options.archivedResources]) {
+            if (!root) continue;
+            const bytes = await readGuideImage(root, path);
+            if (bytes) return bytes;
+          }
         });
       return bytes ? { type: "image", file: bytes } : missing;
     }, missing);
