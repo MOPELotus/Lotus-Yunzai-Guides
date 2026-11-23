@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import type { CommandReply } from "../../lib/commands.ts";
 import { lockFile } from "../../lib/file-lock.ts";
 import { readMigrationSourceFile } from "../../lib/migration-files.ts";
+import { GuideSettingsError } from "./guide-configuration.ts";
 import type { createRoleGuideCache } from "./role-guide-cache.ts";
 import type { createRoleGuideCollections } from "./role-guide-collections.ts";
 import { safeGuideName, type GuideRole } from "./role-guide-input.ts";
@@ -27,7 +28,7 @@ export const starRailStrategyHelp = [
 ].join("\n");
 
 const settingFile = "starrail-strategy.json";
-const ownSource = (value: unknown): value is number => value === 0 || value === 1 || value === 2 || value === 3;
+const ownSource = (value: unknown): value is 0 | 1 | 2 | 3 => value === 0 || value === 1 || value === 2 || value === 3;
 const trailblazerPaths = new Map([
   ["物主", "开拓者·毁灭"], ["火主", "开拓者·存护"], ["虚数主", "开拓者·同谐"],
   ["冰主", "开拓者·记忆"], ["雷主", "开拓者·欢愉"],
@@ -40,6 +41,71 @@ function preference(data: unknown, legacy = false) {
   if (ownSource(value)) return value;
 }
 
+export const starRailStrategyOptions = [
+  { label: "现行角色攻略", value: "current" },
+  { label: "0 · 全部旧编号来源", value: 0 },
+  ...numbers.map(value => ({ label: `${value} · ${sources[value - 1]!.source}`, value })),
+] as const;
+type StrategyChoice = (typeof starRailStrategyOptions)[number]["value"];
+
+export function validStarRailStrategyChoice(value: unknown): value is StrategyChoice {
+  return value === "current" || ownSource(value);
+}
+
+function legacyRoots(installation: string | undefined) {
+  return installation ? ["plugins", "backup/plugins"].map(location => join(installation, location, "StarRail-plugin")) : [];
+}
+
+export function createStarRailStrategyPreference({ cache, settingsRoot, signal }: {
+  readonly cache: string;
+  readonly settingsRoot?: URL;
+  readonly signal?: AbortSignal;
+}) {
+  const installation = settingsRoot && fileURLToPath(settingsRoot);
+
+  async function get(): Promise<StrategyChoice> {
+    try {
+      const file = await readGuideFile(cache, settingFile, 64 * 1024);
+      if (file) return preference(JSON.parse(file.toString("utf8"))) ?? "current";
+    } catch {}
+    if (installation) {
+      for (const base of legacyRoots(installation)) {
+        try {
+          const file = await readMigrationSourceFile(installation, join(base, "config/mys.yaml"), 64 * 1024, signal);
+          if (file) {
+            const value = preference(Bun.YAML.parse(file.bytes.toString("utf8")), true);
+            if (value !== undefined) return value;
+          }
+        } catch {}
+      }
+    }
+    return "current";
+  }
+
+  async function set(source: StrategyChoice, { previous, canWrite }: {
+    readonly previous?: StrategyChoice;
+    readonly canWrite?: () => boolean;
+  } = {}) {
+    const active = () => !signal?.aborted && (!canWrite || canWrite());
+    if (!validStarRailStrategyChoice(source)) throw new GuideSettingsError("input");
+    if (!active()) throw new GuideSettingsError("permission");
+    await mkdir(cache, { recursive: true, mode: 0o700 });
+    const lock = await lockFile(join(cache, ".starrail-strategy.sqlite"), "星铁攻略设置");
+    try {
+      const current = await get();
+      if (previous !== undefined && current !== previous) throw new GuideSettingsError("conflict");
+      if (!active()) throw new GuideSettingsError("permission");
+      if ((previous === undefined || current !== source) && !await writeGuideFile(join(cache, settingFile),
+        JSON.stringify({ defaultSource: source === "current" ? null : source }) + "\n", active)) {
+        throw new GuideSettingsError("permission");
+      }
+      return source;
+    } finally { lock.close(); }
+  }
+
+  return { get, set };
+}
+
 export function createStarRailStrategy(options: {
   readonly cache: string;
   readonly settingsRoot?: URL;
@@ -50,34 +116,8 @@ export function createStarRailStrategy(options: {
 }) {
   const { cache, settingsRoot, signal } = options;
   const installation = settingsRoot && fileURLToPath(settingsRoot);
-  const oldLocations = installation ? ["plugins", "backup/plugins"].map(location => join(installation, location, "StarRail-plugin")) : [];
-
-  async function defaultSource() {
-    try {
-      const file = await readGuideFile(cache, settingFile, 64 * 1024);
-      if (file) return preference(JSON.parse(file.toString("utf8")));
-    } catch {}
-    if (!installation) return;
-    for (const base of oldLocations) {
-      try {
-        const file = await readMigrationSourceFile(installation, join(base, "config/mys.yaml"), 64 * 1024, signal);
-        if (file) {
-          const value = preference(Bun.YAML.parse(file.bytes.toString("utf8")), true);
-          if (value !== undefined) return value;
-        }
-      } catch {}
-    }
-  }
-
-  async function set(source: number, canManage: () => boolean) {
-    await mkdir(cache, { recursive: true, mode: 0o700 });
-    const lock = await lockFile(join(cache, ".starrail-strategy.sqlite"), "星铁攻略设置");
-    try {
-      if (!await writeGuideFile(join(cache, settingFile), JSON.stringify({ defaultSource: source }) + "\n",
-        () => !signal?.aborted && canManage())) throw Error("攻略设置会话已结束。");
-    } finally { lock.close(); }
-    return `已设置星铁默认攻略${source === 0 ? "为全部旧编号来源" : `来源 ${source}（${sources[source - 1]!.source}）`}。`;
-  }
+  const oldLocations = legacyRoots(installation);
+  const strategy = createStarRailStrategyPreference(options);
 
   async function oldImage(source: number, filename: string) {
     if (!installation) return;
@@ -123,8 +163,17 @@ export function createStarRailStrategy(options: {
     const input = selected[1] ?? selected[2];
     const value = input?.toLowerCase() === "all" ? 0 : Number(input);
     if (!ownSource(value)) return "请发送 *设置默认攻略0 至 *设置默认攻略3，0 表示全部旧编号来源。";
-    return set(value, canManage).catch(() => "保存星铁默认攻略失败，请稍后再试。");
+    return strategy.set(value, { canWrite: canManage }).then(() =>
+      `已设置星铁默认攻略${value === 0 ? "为全部旧编号来源" : `来源 ${value}（${sources[value - 1]!.source}）`}。`,
+      () => "保存星铁默认攻略失败，请稍后再试。");
   }
 
-  return { command, defaultSource, lookup };
+  return {
+    command,
+    async defaultSource() {
+      const source = await strategy.get();
+      return source === "current" ? undefined : source;
+    },
+    lookup,
+  };
 }
