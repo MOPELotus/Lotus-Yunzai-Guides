@@ -18,7 +18,7 @@ const helpText = [
 ].join("\n");
 
 type Row = Record<string, unknown>;
-type Transport = (url: string, options: RequestInit) => Promise<Response>;
+type Transport = (url: string, options: RequestInit & { readonly proxy?: false }) => Promise<Response>;
 type Character = { readonly name: string; readonly rarity: number; readonly rate: number };
 type Team = { readonly names: readonly string[]; readonly count: number; readonly full: number; readonly ratio: string };
 type Half = "全部" | "上半" | "下半";
