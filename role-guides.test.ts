@@ -35,7 +35,7 @@ test("攻略使用归档中的用户图与绝区零编号图，当前覆盖优�
     await put(`${archivedZzz}/config/alias.yaml`, aliases);
     const zzzImage = `${archivedZzz}/resources/images/guides/新艾利都快讯/role_guide_艾莲.png`;
     await put(zzzImage, image("归档一号"));
-    const offline = (async () => { throw new Error("不应访问原站"); }) as typeof fetch;
+    const offline = Object.assign(async () => { throw new Error("不应访问原站"); }, { preconnect: fetch.preconnect });
     const search = createRoleGuides({
       cache: join(root, "data/role"), config: join(root, "config"), guideAutomatic: false,
       legacyAddOns: join(root, archivedMora), archivedZzzResources: join(root, archivedZzz, "resources"),
