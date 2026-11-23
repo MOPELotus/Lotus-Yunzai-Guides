@@ -1,5 +1,7 @@
 // Adapted from Miao-Plugin apps/wiki/Calendar.js, CalendarSr.js and CalendarZZZ.js (MIT).
 export const calendarListUrl = "https://hkrpg-api.mihoyo.com/common/hkrpg_cn/announcement/api/getAnnList?game=hkrpg&game_biz=hkrpg_cn&lang=zh-cn&auth_appid=announcement&authkey_ver=1&bundle_id=hkrpg_cn&channel_id=1&level=65&platform=pc&region=prod_gf_cn&sdk_presentation_style=fullscreen&sdk_screen_transparent=true&sign_type=2&uid=100000000";
+// The official Chinese site's announcements channel includes full bodies and prior release notices.
+export const starrailCalendarNewsUrl = "https://act-api-takumi-static.mihoyo.com/content_v2_user/app/1963de8dc19e461c/getContentList?iChanId=257&iPage=1&iPageSize=20&sLangKey=zh-cn&isPreview=0";
 export const calendarContentUrl = "https://hkrpg-api-static.mihoyo.com/common/hkrpg_cn/announcement/api/getAnnContent?game=hkrpg&game_biz=hkrpg_cn&lang=zh-cn&bundle_id=hkrpg_cn&platform=pc&region=prod_gf_cn&level=65&channel_id=1";
 const gsBase = "https://hk4e-api.mihoyo.com/common/hk4e_cn/announcement/api";
 const gsQuery = "game=hk4e&game_biz=hk4e_cn&lang=zh-cn&bundle_id=hk4e_cn&platform=pc&region=cn_gf01&level=55&uid=100000000";
@@ -9,6 +11,7 @@ export const zzzCalendarListUrl = "https://announcement-api.mihoyo.com/common/na
 export const zzzCalendarContentUrl = "https://announcement-static.mihoyo.com/common/nap_cn/announcement/api/getAnnContent?game=nap&game_biz=nap_cn&lang=zh-cn&bundle_id=nap_cn&platform=pc&region=prod_gf_cn&level=70&channel_id=1";
 const day = 86_400_000;
 const china = 8 * 3_600_000;
+const maxRetainedAge = 6 * 3_600_000;
 const ignore = /(更新概览|游戏优化|优化说明|内容专题页|专题展示页|版本更新说明|循星归程|调研|防沉迷|米游社|专项意见|更新修复与优化|问卷调查|有奖问卷|版本更新通知|更新时间说明|预下载功能|周边限时|周边上新|角色演示|角色PV|版本PV|动画短片|bilibili|激励计划|调整说明|攻略征集|测试招募)/u;
 const ignoreIds = new Set([257, 194, 203, 183, 187, 185, 171]);
 const gsIgnoreIds = new Set([495, 1263, 423, 422, 762]);
@@ -19,6 +22,7 @@ const dateText = "\\d{4}[/-]\\d{1,2}[/-]\\d{1,2}\\s+\\d{1,2}:\\d{2}(?::\\d{2})?"
 const datePattern = new RegExp(dateText, "gu");
 const activityHead = /(活动时间|活动跃迁时间|开启时间|上架时间|折扣时间|开放时间|限时活动期|领取时间)\s*[:：]?/gu;
 const challengeNames = ["混沌回忆", "虚构叙事", "末日幻影", "异相仲裁"] as const;
+const starrailVersionTitle = /^\d+\.\d+版本.{0,80}更新(?:概览|说明)$/u;
 const genshinVersionTitle = /(\d+\.\d+|「[^」]+」)版本更新(?:通知|说明|维护预告)/u;
 const genshinRotation = [
   { kind: "newAbyss", name: "幻想真境剧诗", dayOfMonth: 1 },
@@ -206,7 +210,7 @@ function starrailVersionChallenges(details: readonly Record<string, unknown>[], 
   const period = new RegExp(
     `(?:^|\\s|●)([「『]?(?:混沌回忆|虚构叙事|末日幻影)[•·・：:][^。；]{1,64}?)\\s+(${dateText})\\s*[-~～至]\\s*(${dateText})`, "gu");
   for (const detail of details) {
-    if (!/^\d+\.\d+版本.{0,80}更新(?:概览|说明)$/u.test(plain(detail.title))) continue;
+    if (!starrailVersionTitle.test(plain(detail.title))) continue;
     const schedule = section.exec(plain(detail.content))?.[1];
     if (!schedule) continue;
     for (const [, heading, since, until] of schedule.matchAll(period)) {
@@ -215,7 +219,8 @@ function starrailVersionChallenges(details: readonly Record<string, unknown>[], 
       const start = calendarTime(since), end = calendarTime(until);
       if (start === undefined || end === undefined || start >= end ||
           published.some(row => row.kind === kind && row.start === start)) continue;
-      found.set(`${kind}:${start}`, { title, kind, start, end });
+      const key = `${kind}:${start}`;
+      if (!found.has(key)) found.set(key, { title, kind, start, end });
     }
   }
   return [...found.values()];
@@ -371,11 +376,13 @@ const order: Record<CalendarKind, number> = {
   character: 1, tuning: 1, chronicled: 2, weapon: 3, weapon2: 3, bangboo: 4, pass: 5, activity: 5, normal: 10,
 };
 
-export function calendarWindow(data: ReturnType<typeof snapshot>, now: number, stale = false): CalendarData {
+export function calendarWindow(data: ReturnType<typeof snapshot>, now: number, stale = false,
+  archivedChallenges: readonly CalendarRow[] = []): CalendarData {
   const { rows: published, zzzVersionDates, genshinAnchors, updated, detailsAvailable } = data;
   const start = Math.floor((now + china) / day) * day - china - 6 * day;
   const end = start + 13 * day;
-  const rows = [...published, ...zzzChallengeCycles(published, zzzVersionDates, now), ...genshinMonthlyChallenges(published, genshinAnchors, now)]
+  const archived = archivedChallenges.filter(row => !published.some(primary => primary.kind === row.kind && primary.start === row.start));
+  const rows = [...published, ...archived, ...zzzChallengeCycles(published, zzzVersionDates, now), ...genshinMonthlyChallenges(published, genshinAnchors, now)]
     .filter((row) => row.start < end && row.end > start)
     .sort((a, b) => order[a.kind] - order[b.kind] || a.start - b.start || a.end - b.end).slice(0, 60);
   return { rows, updated, detailsAvailable, start, end, now, stale };
@@ -427,31 +434,65 @@ export async function readCalendarJson(response: Response) {
   return JSON.parse((await readCalendarBytes(response, 4 * 1024 * 1024)).toString("utf8")) as unknown;
 }
 
+function starrailVersionsFromNews(response: unknown, now: number) {
+  const data = publicData(response, ["list"]);
+  return records(data.list).slice(0, 20).flatMap(item => {
+    const title = plain(item.sTitle);
+    const publishedAt = calendarTime(item.dtStartTime);
+    if (!starrailVersionTitle.test(title) || typeof item.sContent !== "string" ||
+        !Array.isArray(item.sChanId) || !item.sChanId.includes("257") ||
+        publishedAt === undefined || publishedAt < now - 80 * day || publishedAt > now + 7 * day) return [];
+    return [{ title, content: item.sContent }];
+  });
+}
+
 export function createCalendarSource(game: CalendarGame, options: {
   readonly fetch?: typeof fetch;
   readonly signal?: AbortSignal;
   readonly now?: () => number;
 } = {}) {
-  const transport = calendarTransport(options.fetch ?? fetch, options.signal);
+  const fetcher = options.fetch ?? fetch;
+  const transport = calendarTransport(fetcher, options.signal);
   const [listUrl, contentUrl] = ({
     genshin: [genshinCalendarListUrl, genshinCalendarContentUrl], starrail: [calendarListUrl, calendarContentUrl],
     zzz: [zzzCalendarListUrl, zzzCalendarContentUrl],
   } as const)[game];
   const now = options.now ?? Date.now;
   let retained: ReturnType<typeof snapshot> | undefined;
+  let archivedVersions: { updated: number; rows: readonly CalendarRow[] } | undefined;
+  let newsInFlight: Promise<void> | undefined;
   let active: Promise<ReturnType<typeof snapshot>> | undefined;
   const request = (url: string) => transport(url).then(readCalendarJson);
+
+  async function readStarrailNews() {
+    if (game !== "starrail") return;
+    const timeout = AbortSignal.timeout(3_500);
+    const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+    try {
+      const response = await calendarTransport(fetcher, signal)(starrailCalendarNewsUrl).then(readCalendarJson);
+      const updated = now();
+      archivedVersions = { updated, rows: starrailVersionChallenges(starrailVersionsFromNews(response, updated), []) };
+    } catch {
+      // The same retention bound applies even if the main announcement feed refreshes successfully.
+    }
+  }
+
+  function window(data: ReturnType<typeof snapshot>, time: number, stale = false) {
+    const archive = archivedVersions && time - archivedVersions.updated < maxRetainedAge ? archivedVersions.rows : [];
+    return calendarWindow(data, time, stale, archive);
+  }
   return async () => {
     const time = now();
     if (retained && time - retained.updated < (retained.detailsAvailable ? 600_000 : 60_000)) {
-      return calendarWindow(retained, time);
+      return window(retained, time);
     }
-    active ??= Promise.all([request(listUrl), request(contentUrl).catch(() => undefined)])
+    active ??= Promise.all([request(listUrl), request(contentUrl).catch(() => undefined),
+      newsInFlight ??= readStarrailNews().finally(() => { newsInFlight = undefined; })])
       .then(([list, detail]) => retained = snapshot(list, detail, now(), game)).finally(() => { active = undefined; });
     try {
-      return calendarWindow(await active, now());
+      return window(await active, now());
     } catch (error) {
-      if (retained && time - retained.updated < 6 * 3_600_000) return calendarWindow(retained, time, true);
+      if (retained && time - retained.updated < maxRetainedAge) return window(retained, time, true);
       throw error;
     }
   };

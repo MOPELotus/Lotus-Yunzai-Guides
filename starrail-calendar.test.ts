@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { calendarContentUrl, calendarListUrl, buildStarrailCalendar, calendarTime, createStarrailCalendarSource } from "./calendar-data.ts";
+import { calendarContentUrl, calendarListUrl, buildStarrailCalendar, calendarTime, createStarrailCalendarSource, starrailCalendarNewsUrl } from "./calendar-data.ts";
 import { createStarrailCalendar } from "./calendar.ts";
 
 const now = Date.parse("2026-11-20T03:30:00+08:00");
@@ -63,7 +63,7 @@ test("正文缺失提示，短时复用并在列表故障时使用旧数据", as
   const source = createStarrailCalendarSource({ fetch: transport, now: () => clock });
   expect((await source()).detailsAvailable).toBe(true);
   expect((await source()).stale).toBe(false);
-  expect(requests).toEqual([calendarListUrl, calendarContentUrl]);
+  expect(requests).toEqual([calendarListUrl, calendarContentUrl, starrailCalendarNewsUrl]);
   clock += 601_000;
   offline = true;
   expect((await source()).stale).toBe(true);
@@ -107,4 +107,37 @@ test("星铁版本更新的逐光捡金只读取三种模式的官宣区间，�
   const december = buildStarrailCalendar(list, content, Date.parse("2026-12-15T10:00:00+08:00"));
   expect(december.rows).toContainEqual({ kind: "abyss-1", title: "混沌回忆•漆黑残响",
     start: Date.parse("2026-12-14T04:00:00+08:00"), end: Date.parse("2027-01-25T03:59:00+08:00") });
+});
+
+test("官网公告可补冷启仍在运行的上一版本，同时只保留已经证实的有效缓存", async () => {
+  const old = { sTitle: "4.6版本「月升之前，与兽共舞」版本更新说明", dtStartTime: "2026-09-28 07:00:00", sChanId: ["257"],
+    sContent: "「逐光捡金」：常驻玩法交替更新。 混沌回忆•物竞天择 2026/11/02 04:00 - 2026/12/14 03:59" };
+  const untrustedChannel = { ...old, sChanId: ["258"],
+    sContent: "「逐光捡金」：虚构叙事•无效 2026/11/23 04:00 - 2026/12/23 03:59" };
+  const retired = { ...old, dtStartTime: "2026-02-01 04:00:00",
+    sContent: "「逐光捡金」：末日幻影•过时 2026/11/20 04:00 - 2026/12/25 04:00" };
+  let clock = Date.parse("2026-11-24T10:00:00+08:00");
+  let archiveOffline = false;
+  let archives = 0;
+  const transport = (async (url: string, init: RequestInit) => {
+    expect(init).toMatchObject({ credentials: "omit", redirect: "error" });
+    if (url === calendarListUrl) return Response.json(raw);
+    if (url === calendarContentUrl) return Response.json(detail);
+    expect(url).toBe(starrailCalendarNewsUrl);
+    archives++;
+    return archiveOffline ? new Response(null, { status: 503 }) : Response.json({ retcode: 0,
+      data: { list: [old, untrustedChannel, retired] } });
+  }) as typeof fetch;
+  const source = createStarrailCalendarSource({ fetch: transport, now: () => clock });
+  const archived = (table: Awaited<ReturnType<typeof source>>) => table.rows.filter(row => /物竞天择|无效|过时/u.test(row.title));
+  expect(archived(await source())).toEqual([{ title: "混沌回忆•物竞天择", kind: "abyss-1",
+    start: Date.parse("2026-11-02T04:00:00+08:00"), end: Date.parse("2026-12-14T03:59:00+08:00") }]);
+  expect(archived(await source())).toHaveLength(1);
+  expect(archives).toBe(1);
+  archiveOffline = true;
+  clock += 6 * 3_600_000 - 5_000;
+  expect(archived(await source())).toHaveLength(1);
+  clock += 5_000;
+  expect(archived(await source())).toEqual([]);
+  expect(archives).toBe(2);
 });
