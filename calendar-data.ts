@@ -1,4 +1,4 @@
-// Adapted from Miao-Plugin apps/wiki/Calendar.js and CalendarSr.js (MIT).
+// Adapted from Miao-Plugin apps/wiki/Calendar.js, CalendarSr.js and CalendarZZZ.js (MIT).
 export const calendarListUrl = "https://hkrpg-api.mihoyo.com/common/hkrpg_cn/announcement/api/getAnnList?game=hkrpg&game_biz=hkrpg_cn&lang=zh-cn&auth_appid=announcement&authkey_ver=1&bundle_id=hkrpg_cn&channel_id=1&level=65&platform=pc&region=prod_gf_cn&sdk_presentation_style=fullscreen&sdk_screen_transparent=true&sign_type=2&uid=100000000";
 export const calendarContentUrl = "https://hkrpg-api-static.mihoyo.com/common/hkrpg_cn/announcement/api/getAnnContent?game=hkrpg&game_biz=hkrpg_cn&lang=zh-cn&bundle_id=hkrpg_cn&platform=pc&region=prod_gf_cn&level=65&channel_id=1";
 const gsBase = "https://hk4e-api.mihoyo.com/common/hk4e_cn/announcement/api";
@@ -13,7 +13,8 @@ const ignore = /(更新概览|游戏优化|优化说明|内容专题页|专题�
 const ignoreIds = new Set([257, 194, 203, 183, 187, 185, 171]);
 const gsIgnoreIds = new Set([495, 1263, 423, 422, 762]);
 const gsIgnore = /(内容专题页|版本更新说明|调研|防沉迷|米游社|专项意见|更新修复与优化|问卷调查|版本更新通知|更新时间说明|预下载功能|周边限时|周边上新|角色演示)/u;
-const zzzIgnore = /(测试1|测试2|养成指南|签到福利|绘画征集|活动日历|新品情报|更新公告|更新说明|预约活动|云·绝区零|新剧情|问题修复|已知问题|攻略征集|丽都殊荣|商城|绳网认证分部一览|公平运营声明|防沉迷系统公告|米游社《绝区零》专属工具一览)/u;
+const zzzIgnoreIds = new Set([238, 239, 242, 307, 532]);
+const zzzIgnore = /(测试1|测试2|养成指南|签到福利|绘画征集|活动日历|新品情报|更新说明|预约活动|云·绝区零|新剧情|问题修复|已知问题|攻略征集|丽都殊荣|商城)/u;
 const dateText = "\\d{4}[/-]\\d{1,2}[/-]\\d{1,2}\\s+\\d{1,2}:\\d{2}(?::\\d{2})?";
 const datePattern = new RegExp(dateText, "gu");
 const activityHead = /(活动时间|活动跃迁时间|开启时间|上架时间|折扣时间|开放时间|限时活动期|领取时间)\s*[:：]?/gu;
@@ -213,6 +214,25 @@ function zzzKind(title: string): CalendarKind {
   return "activity";
 }
 
+function zzzChallengeCycles(published: readonly CalendarRow[], versionDates: readonly number[], now: number) {
+  if (!versionDates.some((date) => Math.abs(date - now) <= 56 * day)) return [];
+  // The legacy timeline alternates these two events on Fridays at 04:00 China time.
+  const origin = Date.parse("2024-12-27T04:00:00+08:00");
+  const duration = 14 * day;
+  const current = Math.floor((now - origin) / duration);
+  const forecast: CalendarRow[] = [];
+  for (const cycle of [current, current + 1]) {
+    const start = origin + cycle * duration;
+    const end = start + duration;
+    const kind = cycle % 2 === 0 ? "abyss-1" : "abyss-2";
+    if (published.some((row) => row.kind === kind && row.start < end && row.end > start)) continue;
+    forecast.push({
+      title: kind === "abyss-1" ? "「剧变节点」" : "「危局强袭」", kind, start, end,
+    });
+  }
+  return forecast;
+}
+
 function snapshot(list: unknown, detail: unknown, updated: number, game: CalendarGame) {
   const gs = game === "genshin";
   const zz = game === "zzz";
@@ -222,12 +242,13 @@ function snapshot(list: unknown, detail: unknown, updated: number, game: Calenda
   const gsSections = sections.filter(({ type_label }) => type_label === "游戏公告" || type_label === "活动公告");
   const notices = gs ? (gsSections.length ? gsSections : sections.slice(0, 2))
     .flatMap((entry, index) => records(entry.list).map((item) => ({
-      item, activity: gsSections.length ? entry.type_label === "活动公告" : index === 1,
+      item, activity: gsSections.length ? entry.type_label === "活动公告" : index === 1, picture: false,
     }))) : [
-    ...sections.flatMap((entry) => records(entry.list)),
+    ...sections.flatMap((entry) => records(entry.list).map((item) => ({ item, activity: true, picture: false }))),
     ...records(source.pic_list).flatMap((entry) => records(entry.type_list).flatMap((group) => records(group.list)))
-      .filter((item) => !zz || /活动|限时频段|调频|卓越搭档|剧变节点|危局强袭/u.test(plain(item.title))),
-  ].map((item) => ({ item, activity: true }));
+      .filter((item) => !zz || /活动|限时频段|调频|卓越搭档|剧变节点|危局强袭/u.test(plain(item.title)))
+      .map((item) => ({ item, activity: true, picture: true })),
+  ];
   if (!notices.some(({ item }) => typeof item.ann_id === "number" && typeof item.start_time === "string")) {
     throw new Error("游戏公告列表没有可识别的活动。");
   }
@@ -241,10 +262,10 @@ function snapshot(list: unknown, detail: unknown, updated: number, game: Calenda
   const versions = versionStarts(details, game);
   const byKey = new Map(details.map((item) => [JSON.stringify([item.ann_id, plain(item.title)]), item]));
   const rows = new Map<string, CalendarRow>();
-  for (const { item, activity } of notices) {
+  for (const { item, activity, picture } of notices) {
     const id = item.ann_id;
     let title = plain(item.title);
-    if (typeof id !== "number" || !title || (!zz && (gs ? gsIgnoreIds : ignoreIds).has(id)) ||
+    if (typeof id !== "number" || !title || (zz ? !picture && zzzIgnoreIds.has(id) : (gs ? gsIgnoreIds : ignoreIds).has(id)) ||
         (gs ? gsIgnore : zz ? zzzIgnore : ignore).test(title)) continue;
     const key = JSON.stringify([id, title]);
     if (rows.has(key)) continue;
@@ -261,17 +282,24 @@ function snapshot(list: unknown, detail: unknown, updated: number, game: Calenda
     if (start === undefined || end === undefined || end <= start) continue;
     const character = gs && kind === "character" ? /·([^·(（」]+)[(（]/u.exec(title)?.[1] : undefined;
     if (gs && kind === "weapon") title = title.replace(/(?:单手剑|双手剑|长柄武器|弓|法器)·/gu, "");
-    if (zz) title = title.replace(/(调频|活动|上新)(?:说明|公告)/gu, "$1").replace(/[」](?:说明|公告)/gu, "」");
+    if (zz) title = /预下载/u.test(title) ? "新版本预下载开启" :
+      title.replace(/(调频|活动|上新)(?:说明|公告)/gu, "$1").replace(/[」](?:说明|公告)/gu, "」");
     const wish = gs && (kind === "character" || kind === "weapon" || kind === "chronicled") && /^「[^」]+」祈愿[：:]/u.test(title);
     rows.set(key, {
-      title, kind, start, end, permanent: advertised?.permanent, startUnverified: advertised?.startUnverified,
+      title, kind, start, end, permanent: zz && end - start > 365 * day ? true : advertised?.permanent,
+      startUnverified: advertised?.startUnverified,
       earliestEnd: advertised ? undefined : warp?.earliestEnd,
       ...(wish && advertised?.wishDeadline !== undefined && { wishDeadline: advertised.wishDeadline }),
       banner: !gs || activity ? officialCalendarImage(item.banner) ?? officialCalendarImage(item.img) ?? officialCalendarImage(notice?.img) : undefined,
       icon: officialCalendarImage(item.tag_icon), character,
     });
   }
-  return { rows: [...rows.values()], updated, detailsAvailable };
+  const zzzVersionDates = zz ? [
+    ...versions.values(),
+    ...notices.filter(({ item, picture }) => !picture && /版本.*更新(?:概览|说明)/u.test(plain(item.subtitle)))
+      .map(({ item }) => calendarTime(item.start_time)).filter((date) => date !== undefined),
+  ] : [];
+  return { rows: [...rows.values()], updated, detailsAvailable, zzzVersionDates };
 }
 
 const order: Record<CalendarKind, number> = {
@@ -280,11 +308,13 @@ const order: Record<CalendarKind, number> = {
 };
 
 export function calendarWindow(data: ReturnType<typeof snapshot>, now: number, stale = false): CalendarData {
+  const { rows: published, zzzVersionDates, updated, detailsAvailable } = data;
   const start = Math.floor((now + china) / day) * day - china - 6 * day;
   const end = start + 13 * day;
-  const rows = data.rows.filter((row) => row.start < end && row.end > start)
+  const rows = [...published, ...zzzChallengeCycles(published, zzzVersionDates, now)]
+    .filter((row) => row.start < end && row.end > start)
     .sort((a, b) => order[a.kind] - order[b.kind] || a.start - b.start || a.end - b.end).slice(0, 60);
-  return { ...data, rows, start, end, now, stale };
+  return { rows, updated, detailsAvailable, start, end, now, stale };
 }
 
 export function buildStarrailCalendar(list: unknown, content: unknown, now: number): CalendarData {

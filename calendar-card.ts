@@ -28,7 +28,7 @@ function time(value: number, year = false) {
 }
 
 function relative(milliseconds: number) {
-  if (milliseconds >= day) return `${Math.floor(milliseconds / day)}天`;
+  if (milliseconds >= day) return `${Math.round(milliseconds / day)}天`;
   if (milliseconds >= 3_600_000) return `${Math.floor(milliseconds / 3_600_000)}小时`;
   return `${Math.max(1, Math.floor(milliseconds / 60_000))}分钟`;
 }
@@ -175,7 +175,9 @@ export async function renderCalendar(data: CalendarData, mode: "calendar" | "lis
   ].filter((item): item is string => !!item);
   const [background, icon, challenges, remote, genshin] = await Promise.all([
     themeImage(source, hydro ? "common/bg/bg-hydro.webp" : "common/bg/bg-sr.webp"), themeImage(source, "wiki/imgs/calendar-icon.png"),
-    Promise.all(Object.values(challengeTheme).map(async ({ image }) => [image, await themeImage(source, "wiki/imgs/" + image)] as const)),
+    Promise.all(Object.entries(challengeTheme).map(async ([kind, theme]) => [kind, await Promise.all([
+      themeImage(source, "wiki/imgs/" + theme.image), themeImage(source, `wiki/imgs/${kind}-icon.png`),
+    ])] as const)),
     Promise.all(urls.map(async (url) => [url, await webImage(url, transport, options.signal)] as const)),
     Promise.all([...new Set(characterFiles)].map(async (path) => [path, await themeImage(source, path)] as const)),
   ]);
@@ -257,9 +259,10 @@ export async function renderCalendar(data: CalendarData, mode: "calendar" | "lis
       c.clip();
       c.fillStyle = theme?.color ?? "#e8e2d8";
       c.fillRect(x, y, w, h);
-      const banner = portrait(row.character, "card") || (row.banner && media.get(row.banner)) || (theme && local.get(theme.image));
+      const [challengeBanner, challengeIcon] = local.get(row.kind) ?? [];
+      const banner = portrait(row.character, "card") || (row.banner && media.get(row.banner)) || challengeBanner;
       const face = portrait(row.character, "face");
-      const badge = face || (row.icon && media.get(row.icon)) || icon;
+      const badge = face || (row.icon && media.get(row.icon)) || challengeIcon || icon;
       const padding = badge && w >= 115 ? small ? 37 : narrow ? 40 : 54 : 8;
       const heading = narrow ? row.character ?? /^「([^」]+)」/u.exec(row.title)?.[1] ?? row.title : row.title;
       const summary = narrow && !row.startUnverified && data.now < row.start ? time(row.start) : label(row, data.now, w > 365);
