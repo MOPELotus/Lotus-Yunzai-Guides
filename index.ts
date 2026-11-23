@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { Job } from "node-schedule";
 import type { CommandModule } from "../../lib/commands.ts";
-import type { MessageSegment } from "../../lib/messages.ts";
+import type { MessageEvent, MessageSegment } from "../../lib/messages.ts";
 import { teamGuides } from "./team-guides.ts";
 import { createTeamResources } from "./team-resources.ts";
 import { createRoleGuides } from "./role-guides.ts";
@@ -17,11 +17,16 @@ import { createCalendarSchedule, type CalendarSchedule, type CalendarScheduleOpt
 import { guideFlags, readGuidesConfiguration } from "./guide-configuration.ts";
 
 type TeamResources = ReturnType<typeof createTeamResources>;
+type GuideRefreshSource = {
+  readonly label: string;
+  refresh(force: boolean): Promise<"updated" | "current">;
+};
 
 export function createGuidesModule(options: {
   readonly directory: string;
   readonly forward?: boolean;
   readonly resources?: TeamResources;
+  readonly refreshSources?: readonly GuideRefreshSource[];
   readonly roleGuides?: ReturnType<typeof createRoleGuides>;
   readonly roleMaterials?: ReturnType<typeof createRoleMaterials>;
   readonly roleReferences?: ReturnType<typeof createRoleReferences>;
@@ -44,14 +49,34 @@ export function createGuidesModule(options: {
       return await resources.available() ? "配队资源更新失败，仍使用已有资源。" : "配队资源下载失败，请稍后重试。";
     }
   };
+  const refreshAll = async (force: boolean, argument: string, { isMaster, isDelegated, reply }:
+    Pick<MessageEvent, "isMaster" | "isDelegated" | "reply">) => {
+    if (!isMaster || isDelegated) return "只有主人可以更新攻略资源。";
+    if (argument) return force ? "请发送 #强制更新攻略资源。" : "请发送 #更新攻略资源。";
+    const sources = options.refreshSources;
+    if (!sources?.length) return "当前没有可更新的攻略资源。";
+    try { await reply("正在检查角色、配队、复刻表和深渊参考资源。"); } catch {}
+    const results: string[] = [];
+    for (const source of sources) {
+      try {
+        results.push(`${source.label}：${await source.refresh(force) === "updated" ? "已更新" : "已是最新"}`);
+      } catch {
+        results.push(`${source.label}：更新失败，保留本地资源`);
+      }
+    }
+    return results.join("\n");
+  };
   return {
     name: "@lotus-yunzai/guides",
     commands: {
       "#更新配队资源": refresh(false),
       "#强制更新配队资源": refresh(true),
     },
-    async fallback(message, { normalizedMessage, isMaster, inlineImageByteLimit }) {
-      const command = normalizedMessage || message;
+    async fallback(message, context) {
+      const { normalizedMessage, isMaster, inlineImageByteLimit } = context;
+      const command = (normalizedMessage || message).trim();
+      const refresh = /^#(强制)?更新攻略资源(?:\s+(.*))?$/su.exec(command);
+      if (refresh) return refreshAll(!!refresh[1], refresh[2] ?? "", context);
       const calendar = options.genshinCalendar?.(command) ?? options.starrailCalendar?.(command) ?? options.zzzCalendar?.(command);
       if (calendar !== undefined) return calendar;
       const banners = options.bannerTables?.(command);
@@ -179,6 +204,12 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
   const zzzCalendar = createZzzCalendar({ signal: refreshSignal });
   const resources = directory ? undefined : createTeamResources({ root, fallback: legacyDirectory,
     alternatives: guidePack.map(pack => join(pack, "Genshin", "TeamGuides")), signal: refreshSignal });
+  const refreshSources = [
+    { label: "角色和进阶攻略", refresh: original.refresh },
+    ...(resources ? [{ label: "配队资源", refresh: resources.refresh }] : []),
+    { label: "复刻表", refresh: bannerResources.refresh },
+    { label: "深渊参考图", refresh: abyssResources.refresh },
+  ];
   const scheduled = guidesSchedule && await createCalendarSchedule({
     signal: refreshSignal, root: installation, lockFile,
     register: guidesSchedule.registerTask, targets: guidesSchedule.targets,
@@ -208,14 +239,15 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
     stopAbyss = startResourceRefresh(abyssResources, refreshSignal, "abyss-reference", "深渊参考图资源");
   });
   return {
-    ...createGuidesModule({ directory: directory ?? legacyDirectory, forward, resources, roleGuides, roleReferences, roleMaterials,
+    ...createGuidesModule({ directory: directory ?? legacyDirectory, forward, resources, refreshSources, roleGuides, roleReferences, roleMaterials,
       starrailCalendar, genshinCalendar, zzzCalendar, bannerTables, abyssReferences, akashaAbyss }),
     async dispose() {
       controller.abort();
       if (cancelStart) cancelStart();
       unregister?.();
       await scheduled?.stop();
-      await stopOriginal?.();
+      if (stopOriginal) await stopOriginal();
+      else await original.wait();
       if (stopBanners) await stopBanners();
       else await bannerResources.wait();
       if (stopAbyss) await stopAbyss();

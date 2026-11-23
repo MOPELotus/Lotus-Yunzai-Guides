@@ -11,6 +11,31 @@ import { createTeamResources, guideSource } from "./team-resources.ts";
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X9uoAAAAASUVORK5CYII=", "base64");
 const directory = "Genshin/TeamGuides";
 
+test("主人可手动刷新全部攻略资源，部分原站失败时仍继续并逐项回执", async () => {
+  const registry = new CommandRegistry();
+  const calls: Array<[string, boolean]> = [];
+  registry.registerModule(createGuidesModule({ directory: "/unused", refreshSources: [
+    { label: "角色", async refresh(force) { calls.push(["角色", force]); return "current"; } },
+    { label: "复刻表", async refresh(force) { calls.push(["复刻表", force]); throw new Error("offline"); } },
+    { label: "深渊参考图", async refresh(force) { calls.push(["深渊参考图", force]); return "updated"; } },
+  ] }));
+  const replies: unknown[] = [];
+  function dispatch(msg: string, isMaster = true, isDelegated = false) {
+    return registry.dispatchFallback({
+      msg, raw_message: msg, message: msg, post_type: "message", message_type: "terminal", isMaster,
+      isPrivate: false, isGroup: false, isDelegated, reply(message) { replies.push(message); return true; },
+    }, () => true, () => isMaster);
+  }
+  expect(await dispatch("#更新攻略资源", false)).toContain("只有主人");
+  expect(await dispatch("#更新攻略资源", true, true)).toContain("只有主人");
+  expect(await dispatch("#强制更新攻略资源 参数")).toContain("请发送");
+  expect(calls).toEqual([]);
+  expect(await dispatch("#强制更新攻略资源"))
+    .toBe("角色：已是最新\n复刻表：更新失败，保留本地资源\n深渊参考图：已更新");
+  expect(replies).toHaveLength(1);
+  expect(calls).toEqual([["角色", true], ["复刻表", true], ["深渊参考图", true]]);
+});
+
 function git(cwd: string, ...args: string[]) {
   const result = Bun.spawnSync(["git", ...args], { cwd, stderr: "pipe" });
   if (result.exitCode) throw new Error(result.stderr.toString());
