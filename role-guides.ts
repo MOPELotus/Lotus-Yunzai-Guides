@@ -3,9 +3,10 @@ import { join } from "node:path";
 import type { CommandReply } from "../../lib/commands.ts";
 import { createGenshinStrategyPreference, genshinStrategyHelp, genshinStrategyNumber, genshinStrategySource } from "./genshin-strategy.ts";
 import { createRoleGuideCollections } from "./role-guide-collections.ts";
+import { createRoleGuideCache } from "./role-guide-cache.ts";
 import { createRoleResourcePack, type RolePackFallback, type RolePackSnapshot } from "./role-resource-pack.ts";
 import { guideGames, parseGuideCommand, resolveGuideRole, safeGuideName, type GuideGame, type GuideRole } from "./role-guide-input.ts";
-import { findGuidePack, readGuideImage, writeGuideFile, type GuideImage } from "./role-image-files.ts";
+import { findGuidePack, readGuideImage, type GuideImage } from "./role-image-files.ts";
 import { createZzzStrategy } from "./zzz-strategy.ts";
 
 export function createRoleGuides(options: {
@@ -24,8 +25,12 @@ export function createRoleGuides(options: {
   readonly forward?: boolean;
   readonly fetch?: typeof fetch;
   readonly guideSource?: string;
+  readonly now?: () => number;
 }) {
   const collections = createRoleGuideCollections(options);
+  const readCollectionImage = createRoleGuideCache({
+    cache: options.cache, automatic: options.guideAutomatic, signal: options.signal, now: options.now,
+  });
   const rolePack = createRoleResourcePack({
     root: join(options.cache, "mora"), fallback: options.guidePack, snapshot: options.guideSnapshot,
     automatic: options.guideAutomatic,
@@ -48,7 +53,7 @@ export function createRoleGuides(options: {
   }
 
   const zzz = createZzzStrategy({ cache: options.cache, legacyRoot: options.legacyZzzRoot,
-    legacyResources: options.legacyZzzResources, collections, operation });
+    legacyResources: options.legacyZzzResources, collections, readCollectionImage, operation });
 
   async function legacyImage(source: number, filename: string) {
     for (const directory of options.legacyStrategies ?? []) {
@@ -64,14 +69,8 @@ export function createRoleGuides(options: {
     return operation(`gs/${role.name}/numbered/${source}`, update, async () => {
       const filename = role.name + ".jpg";
       const local = join("numbered", String(source), filename);
-      let bytes = await readGuideImage(options.cache, local) ?? await legacyImage(source, filename);
-      if (!bytes || update) {
-        const downloaded = await collections.image(role, author, update, "gs");
-        if (downloaded) {
-          await writeGuideFile(join(options.cache, local), downloaded).catch(() => {});
-          bytes = downloaded;
-        }
-      }
+      const bytes = await readCollectionImage(local, update,
+        () => collections.image(role, author, update, "gs"), () => legacyImage(source, filename));
       return bytes ? { type: "image", file: bytes } : error;
     }, error);
   }
@@ -109,18 +108,12 @@ export function createRoleGuides(options: {
       if (packedNames.has(author.source) || atlas?.source === author.source) return;
       const filename = role.name + ".jpg";
       const local = join(author.source, suffix, filename);
-      let saved = await readGuideImage(options.cache, local);
-      if (!saved && game === "gs") {
+      const bytes = await readCollectionImage(local, update, () => collections.image(role, author, update), async () => {
+        if (game !== "gs") return;
         const number = genshinStrategyNumber(author);
-        if (number !== undefined) saved = await legacyImage(number, filename);
-      }
-      if (saved && !update) return { source: author.source, bytes: saved };
-      const bytes = await collections.image(role, author, update);
-      if (bytes) {
-        await writeGuideFile(join(options.cache, local), bytes).catch(() => {});
-        return { source: author.source, bytes };
-      }
-      if (saved) return { source: author.source, bytes: saved };
+        if (number !== undefined) return legacyImage(number, filename);
+      });
+      if (bytes) return { source: author.source, bytes };
     }));
     for (const image of fromCollections) if (image) images.push(image);
     images.push(...overrides);

@@ -4,6 +4,7 @@ import type { CommandReply } from "../../lib/commands.ts";
 import type { MessageSegment } from "../../lib/messages.ts";
 import { lockFile } from "../../lib/file-lock.ts";
 import type { createRoleGuideCollections } from "./role-guide-collections.ts";
+import type { createRoleGuideCache } from "./role-guide-cache.ts";
 import { guideKey, safeGuideName } from "./role-guide-input.ts";
 import { GuideSettingsError } from "./guide-configuration.ts";
 import { readGuideFile, readGuideImage, writeGuideFile } from "./role-image-files.ts";
@@ -116,6 +117,7 @@ export function createZzzStrategy(options: {
   readonly legacyResources?: string;
   readonly legacyRoot?: string;
   readonly collections: ReturnType<typeof createRoleGuideCollections>;
+  readonly readCollectionImage: ReturnType<typeof createRoleGuideCache>;
   operation(key: string, update: boolean, load: () => Promise<GuideReply>, error: string): Promise<GuideReply>;
 }) {
   const { read: settings, write } = createZzzStrategySettings(options);
@@ -142,17 +144,10 @@ export function createZzzStrategy(options: {
     return options.operation(`zzz/${name}/numbered/${number}`, update, async () => {
       const filename = `role_guide_${name}.png`;
       const local = join("numbered", "ZenlessZoneZero", author.source, filename);
-      let bytes = await readGuideImage(options.cache, local);
-      if (!bytes && options.legacyResources) {
-        bytes = await readGuideImage(options.legacyResources, join("images", "guides", author.source, filename));
-      }
-      if (!bytes || update) {
-        const downloaded = await options.collections.image({ name }, author, update, "zzz");
-        if (downloaded) {
-          await writeGuideFile(join(options.cache, local), downloaded).catch(() => {});
-          bytes = downloaded;
-        }
-      }
+      const bytes = await options.readCollectionImage(local, update,
+        () => options.collections.image({ name }, author, update, "zzz"), async () => {
+          if (options.legacyResources) return readGuideImage(options.legacyResources, join("images", "guides", author.source, filename));
+        });
       return bytes ? { type: "image", file: bytes } : missing;
     }, missing);
   }

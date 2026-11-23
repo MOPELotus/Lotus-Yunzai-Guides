@@ -131,8 +131,10 @@ export function createRoleGuideCollections(options: {
   readonly settingsRoot?: URL;
   readonly fetch?: GuideFetch;
   readonly signal?: AbortSignal;
+  readonly now?: () => number;
 }) {
   const transport = options.fetch ?? fetch;
+  const now = options.now ?? Date.now;
   type CollectionRead = { time: number; pending: boolean; posts: Promise<readonly Record<string, unknown>[]> };
   const reads = new Map<string, CollectionRead>();
   function signal(milliseconds: number) {
@@ -153,7 +155,7 @@ export function createRoleGuideCollections(options: {
     const gid = zzz ? "8" : "2";
     const key = `${gid}/${id}`;
     const existing = reads.get(key);
-    if (existing && (existing.pending || (!refresh && Date.now() - existing.time < 120_000))) return existing.posts;
+    if (existing && (existing.pending || (!refresh && now() - existing.time < 120_000))) return existing.posts;
     const url = new URL(collectionUrl);
     url.searchParams.set("gids", gid);
     if (!zzz) url.searchParams.set("order_type", "2");
@@ -164,7 +166,7 @@ export function createRoleGuideCollections(options: {
       return objects(object(result.data).posts);
     })();
     const reading: CollectionRead = {
-      time: Date.now(), pending: true,
+      time: now(), pending: true,
       posts: requestPosts.catch(() => {
         if (reads.get(key) === reading) reads.delete(key);
         return [];

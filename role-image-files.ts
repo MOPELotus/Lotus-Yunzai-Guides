@@ -2,7 +2,7 @@ import { renameSync } from "node:fs";
 import { mkdir, realpath, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import { guideKey, safeGuideName } from "./role-guide-input.ts";
-import { pngHeader, readResource } from "./team-guides.ts";
+import { pngHeader, readResource, readResourceSnapshot } from "./team-guides.ts";
 
 export const roleImageLimit = 16 * 1024 * 1024;
 export type GuideImage = { readonly source: string; readonly bytes: Buffer };
@@ -21,8 +21,15 @@ export async function readGuideFile(root: string, file: string, limit: number): 
 }
 
 export async function readGuideImage(root: string, file: string): Promise<Buffer | undefined> {
-  const bytes = await readGuideFile(root, file, roleImageLimit);
-  if (bytes && isGuideImage(bytes)) return bytes;
+  return (await readGuideImageSnapshot(root, file))?.bytes;
+}
+
+export async function readGuideImageSnapshot(root: string, file: string) {
+  try {
+    const base = await realpath(root);
+    const snapshot = await readResourceSnapshot(base, join(base, file), roleImageLimit);
+    if (isGuideImage(snapshot.bytes)) return snapshot;
+  } catch {}
 }
 
 export async function writeGuideFile(file: string, bytes: string | Uint8Array, canWrite?: () => boolean) {

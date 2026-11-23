@@ -81,7 +81,7 @@ function searchTeams(teams: TeamIndex, query: string) {
   };
 }
 
-export async function readResource(root: string, file: string, limit: number): Promise<Buffer> {
+export async function readResourceSnapshot(root: string, file: string, limit: number) {
   const path = await realpath(file);
   const rel = relative(root, path);
   if (!rel || isAbsolute(rel) || rel === ".." || rel.startsWith(`..${sep}`)) {
@@ -99,10 +99,14 @@ export async function readResource(root: string, file: string, limit: number): P
       offset += bytesRead;
     }
     if (offset !== info.size) throw new Error("读取期间配队资源发生变化。");
-    return buffer.subarray(0, offset);
+    return { bytes: buffer.subarray(0, offset), modifiedAt: info.mtimeMs };
   } finally {
     await handle.close();
   }
+}
+
+export async function readResource(root: string, file: string, limit: number): Promise<Buffer> {
+  return (await readResourceSnapshot(root, file, limit)).bytes;
 }
 
 export async function teamGuides(directory: string, query: string, forward: boolean): Promise<CommandReply> {
