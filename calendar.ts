@@ -26,8 +26,8 @@ function formatCalendarText(table: CalendarData, label: string, title: string, r
   const heading = [`${label}${title} · ${reason}`, ...(table.stale ? ["以下为上次读取的公告。"] : []),
     ...(!table.detailsAvailable ? ["公告详情暂不可用。"] : [])];
   if (!table.rows.length) return [...heading, "当前日期范围暂无活动公告。"].join("\n");
-  const lines = table.rows.slice(0, 10).map(({ title, start, end, permanent }) =>
-    `${title.slice(0, 120)} · ${date(start)}${permanent ? " 起长期有效" : " 至 " + date(end)}`);
+  const lines = table.rows.slice(0, 10).map(({ title, start, end, permanent, monthlyRotation }) =>
+    `${title.slice(0, 120)} · ${date(start)}${permanent ? " 起长期有效" : " 至 " + date(end)}${monthlyRotation ? "（按月轮换）" : ""}`);
   if (table.rows.length > lines.length) lines.push(`另有 ${table.rows.length - lines.length} 项活动。`);
   return [...heading, ...lines].join("\n");
 }

@@ -40,6 +40,7 @@ function label(row: CalendarRow, now: number, showStart: boolean) {
   const crossesYear = new Date(row.start + china).getUTCFullYear() !== new Date(row.end + china).getUTCFullYear();
   const start = time(row.start, crossesYear);
   const end = time(row.end, crossesYear);
+  if (row.monthlyRotation) return `按月轮换 · ${showStart ? start + " ~ " : ""}${end}`;
   if (row.start > now) return `${start}（${relative(row.start - now)}后开始）`;
   if (row.end > now) return `${showStart ? start + " ~ " : ""}${end}（${relative(row.end - now)}后结束）`;
   return `${start} ~ ${end}`;
@@ -265,7 +266,8 @@ export async function renderCalendar(data: CalendarData, mode: "calendar" | "lis
       const badge = face || (row.icon && media.get(row.icon)) || challengeIcon || icon;
       const padding = badge && w >= 115 ? small ? 37 : narrow ? 40 : 54 : 8;
       const heading = narrow ? row.character ?? /^「([^」]+)」/u.exec(row.title)?.[1] ?? row.title : row.title;
-      const summary = narrow && !row.startUnverified && data.now < row.start ? time(row.start) : label(row, data.now, w > 365);
+      const summary = narrow && !row.startUnverified && data.now < row.start
+        ? `${row.monthlyRotation ? "按月轮换 · " : ""}${time(row.start)}` : label(row, data.now, w > 365);
       const textWidth = Math.max(0, (banner && !narrow ? w * 0.76 : w) - padding - 8);
       if (banner && w >= 60) {
         const bw = Math.min(Math.round(w * 0.6), 500);

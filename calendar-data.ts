@@ -19,6 +19,12 @@ const dateText = "\\d{4}[/-]\\d{1,2}[/-]\\d{1,2}\\s+\\d{1,2}:\\d{2}(?::\\d{2})?"
 const datePattern = new RegExp(dateText, "gu");
 const activityHead = /(活动时间|活动跃迁时间|开启时间|上架时间|折扣时间|开放时间|限时活动期|领取时间)\s*[:：]?/gu;
 const challengeNames = ["混沌回忆", "虚构叙事", "末日幻影", "异相仲裁"] as const;
+const genshinVersionTitle = /(\d+\.\d+|「[^」]+」)版本更新(?:通知|说明|维护预告)/u;
+const genshinRotation = [
+  { kind: "newAbyss", name: "幻想真境剧诗", dayOfMonth: 1 },
+  { kind: "abyss", name: "深境螺旋", dayOfMonth: 16 },
+] as const;
+type GenshinRotationAnchor = { readonly kind: typeof genshinRotation[number]["kind"]; readonly time: number; readonly dayOfMonth: number };
 
 export type CalendarGame = "genshin" | "starrail" | "zzz";
 export type CalendarKind = "character" | "tuning" | "weapon" | "weapon2" | "bangboo" | "chronicled" | "pass" | "normal" | "activity" | "abyss" | "newAbyss" |
@@ -32,6 +38,7 @@ export interface CalendarRow {
   readonly wishDeadline?: number;
   readonly permanent?: boolean;
   readonly startUnverified?: boolean;
+  readonly monthlyRotation?: boolean;
   readonly banner?: string;
   readonly icon?: string;
   readonly character?: string;
@@ -100,7 +107,7 @@ function versionStarts(details: readonly Record<string, unknown>[], game: Calend
   const starts = new Map<string, number>();
   for (const item of details) {
     const zz = game === "zzz";
-    const pattern = game === "genshin" ? /(\d+\.\d+|「[^」]+」)版本更新(?:通知|说明|维护预告)/u
+    const pattern = game === "genshin" ? genshinVersionTitle
       : /^(\d+\.\d+)版本.*更新(?:概览|说明|维护预告)/u;
     const version = pattern.exec(plain(zz ? item.subtitle : item.title))?.[1];
     if (!version) continue;
@@ -193,6 +200,27 @@ function kindFor(title: string): CalendarKind {
   return "activity";
 }
 
+function starrailVersionChallenges(details: readonly Record<string, unknown>[], published: readonly CalendarRow[]) {
+  const found = new Map<string, CalendarRow>();
+  const section = /「逐光捡金」\s*[:：]([^■]+)/u;
+  const period = new RegExp(
+    `(?:^|\\s|●)([「『]?(?:混沌回忆|虚构叙事|末日幻影)[•·・：:][^。；]{1,64}?)\\s+(${dateText})\\s*[-~～至]\\s*(${dateText})`, "gu");
+  for (const detail of details) {
+    if (!/^\d+\.\d+版本.{0,80}更新(?:概览|说明)$/u.test(plain(detail.title))) continue;
+    const schedule = section.exec(plain(detail.content))?.[1];
+    if (!schedule) continue;
+    for (const [, heading, since, until] of schedule.matchAll(period)) {
+      const title = heading!.replace(/^[「『]|[」』]$/gu, "");
+      const kind = kindFor(title);
+      const start = calendarTime(since), end = calendarTime(until);
+      if (start === undefined || end === undefined || start >= end ||
+          published.some(row => row.kind === kind && row.start === start)) continue;
+      found.set(`${kind}:${start}`, { title, kind, start, end });
+    }
+  }
+  return [...found.values()];
+}
+
 function genshinKind(title: string, activity: boolean): CalendarKind {
   if (/^(?:[「『])?幻想真境剧诗/u.test(title)) return "newAbyss";
   if (/^(?:[「『])?深境螺旋/u.test(title)) return "abyss";
@@ -200,6 +228,39 @@ function genshinKind(title: string, activity: boolean): CalendarKind {
   if (/祈愿/u.test(title) && /概率UP/u.test(title)) return /单手剑|双手剑|长柄武器|弓·|法器·/u.test(title) ? "weapon" : "character";
   if (/纪行/u.test(title)) return "pass";
   return activity ? "activity" : "normal";
+}
+
+function genshinRotationAnchors(details: readonly Record<string, unknown>[], versions: ReadonlyMap<string, number>) {
+  const anchors: GenshinRotationAnchor[] = [];
+  const announced = /(?:新一期|第一期|第二期)?(幻想真境剧诗|深境螺旋)将于(\d{1,2})月(\d{1,2})日更新/gu;
+  for (const detail of details) {
+    const version = genshinVersionTitle.exec(plain(detail.title))?.[1];
+    const opened = version && versions.get(version);
+    if (typeof opened !== "number") continue;
+    const year = new Date(opened + china).getUTCFullYear();
+    for (const [, name, month, dayOfMonth] of plain(detail.content).matchAll(announced)) {
+      const rule = genshinRotation.find(row => row.name === name);
+      const dates = [year, year + 1].map(value => calendarTime(`${value}/${month}/${dayOfMonth} 04:00:00`));
+      const time = dates.find(date => date !== undefined && date >= opened - day && date <= opened + 60 * day);
+      if (rule && time !== undefined) anchors.push({ kind: rule.kind, time, dayOfMonth: Number(dayOfMonth) });
+    }
+  }
+  return anchors;
+}
+
+function genshinMonthlyChallenges(published: readonly CalendarRow[], anchors: readonly GenshinRotationAnchor[], now: number) {
+  const today = new Date(now + china);
+  return genshinRotation.flatMap(({ kind, name, dayOfMonth }) => {
+    const nearby = anchors.filter(row => row.kind === kind && Math.abs(row.time - now) <= 45 * day);
+    if (!nearby.length || nearby.some(row => row.dayOfMonth !== dayOfMonth)) return [];
+    return [-1, 0, 1].flatMap(offset => {
+      const month = today.getUTCMonth() + offset;
+      const start = Date.UTC(today.getUTCFullYear(), month, dayOfMonth, 4) - china;
+      const end = Date.UTC(today.getUTCFullYear(), month + 1, dayOfMonth, 4) - china - 1_000;
+      if (published.some(row => row.kind === kind && row.start < end && row.end > start)) return [];
+      return [{ title: `「${name}」· ${new Date(start + china).toISOString().slice(0, 7)}`, kind, start, end, monthlyRotation: true }];
+    });
+  });
 }
 
 function zzzKind(title: string): CalendarKind {
@@ -299,7 +360,10 @@ function snapshot(list: unknown, detail: unknown, updated: number, game: Calenda
     ...notices.filter(({ item, picture }) => !picture && /版本.*更新(?:概览|说明)/u.test(plain(item.subtitle)))
       .map(({ item }) => calendarTime(item.start_time)).filter((date) => date !== undefined),
   ] : [];
-  return { rows: [...rows.values()], updated, detailsAvailable, zzzVersionDates };
+  const published = [...rows.values()];
+  if (game === "starrail") published.push(...starrailVersionChallenges(details, published));
+  const genshinAnchors = gs ? genshinRotationAnchors(details, versions) : [];
+  return { rows: published, updated, detailsAvailable, zzzVersionDates, genshinAnchors };
 }
 
 const order: Record<CalendarKind, number> = {
@@ -308,10 +372,10 @@ const order: Record<CalendarKind, number> = {
 };
 
 export function calendarWindow(data: ReturnType<typeof snapshot>, now: number, stale = false): CalendarData {
-  const { rows: published, zzzVersionDates, updated, detailsAvailable } = data;
+  const { rows: published, zzzVersionDates, genshinAnchors, updated, detailsAvailable } = data;
   const start = Math.floor((now + china) / day) * day - china - 6 * day;
   const end = start + 13 * day;
-  const rows = [...published, ...zzzChallengeCycles(published, zzzVersionDates, now)]
+  const rows = [...published, ...zzzChallengeCycles(published, zzzVersionDates, now), ...genshinMonthlyChallenges(published, genshinAnchors, now)]
     .filter((row) => row.start < end && row.end > start)
     .sort((a, b) => order[a.kind] - order[b.kind] || a.start - b.start || a.end - b.end).slice(0, 60);
   return { rows, updated, detailsAvailable, start, end, now, stale };

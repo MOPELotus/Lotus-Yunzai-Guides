@@ -143,3 +143,30 @@ test("原神生日使用旧角色资料，天赋材料在北京时间四点更�
     await rm(root, { recursive: true, force: true });
   }
 });
+
+
+test("原神各挑战只在近期官宣佐证时按月标记，独立确期公告优先、改期时不外推", () => {
+  const version = show(22015, "「坏灭肇始之时」7.2版本更新说明");
+  const rotation = "〓更新时间〓 2026/11/04 06:00 开始，预计5个小时完成。 九、幻想真境剧诗 12月1日更新 " +
+    "7.2版本更新完成后，新一期幻想真境剧诗将于12月1日更新。 十、深境螺旋 11月16日更新 " +
+    "第一期深境螺旋将于11月16日更新。第二期深境螺旋将于12月16日更新。";
+  const list = { retcode: 0, data: { list: [{ type_label: "游戏公告", list: [version] }] } };
+  const details = { retcode: 0, data: { list: [{ ...version, content: rotation }] } };
+  const view = (now: string, body: unknown = details) => buildGenshinCalendar(list, body, at(now)).rows;
+  expect(view("2026-11-24T18:00:00")).toEqual([
+    { kind: "newAbyss", title: "「幻想真境剧诗」· 2026-11", start: at("2026-11-01T04:00:00"),
+      end: at("2026-12-01T03:59:59"), monthlyRotation: true },
+    { kind: "abyss", title: "「深境螺旋」· 2026-11", start: at("2026-11-16T04:00:00"),
+      end: at("2026-12-16T03:59:59"), monthlyRotation: true },
+  ]);
+  expect(view("2027-03-15T18:00:00")).toEqual([]);
+  expect(view("2026-11-24T18:00:00", { retcode: 0, data: { list: [{ ...version,
+    content: rotation.replace("12月16日更新", "12月17日更新") }] } }).map(row => row.kind)).toEqual(["newAbyss"]);
+  const direct = show(22016, "深境螺旋本期活动");
+  const official = buildGenshinCalendar({ retcode: 0, data: { list: [{ type_label: "活动公告", list: [version, direct] }] } },
+    { retcode: 0, data: { list: [...details.data.list, { ...direct,
+      content: "〓挑战时间〓 2026/11/16 05:00:00 ~ 2026/12/16 03:59:59" }] } }, at("2026-11-24T18:00:00"));
+  const explicit = official.rows.filter(row => row.kind === "abyss");
+  expect(explicit).toEqual([expect.objectContaining({ start: at("2026-11-16T05:00:00") })]);
+  expect(explicit[0]).not.toHaveProperty("monthlyRotation");
+});

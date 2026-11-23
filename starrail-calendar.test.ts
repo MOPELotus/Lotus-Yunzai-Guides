@@ -79,3 +79,32 @@ test("正文缺失提示，短时复用并在列表故障时使用旧数据", as
   expect(plain.rows.some(({ kind }) => kind === "abyss-4")).toBe(false);
   expect(plain.rows.length).toBeGreaterThan(0);
 });
+
+
+test("星铁版本更新的逐光捡金只读取三种模式的官宣区间，独立公告优先且不推算仲裁", () => {
+  const notice = (ann_id: number, title: string) => ({ ann_id, title,
+    start_time: "2026-11-11 07:00:00", end_time: "2026-12-23 07:00:00" });
+  const version = notice(1474, "4.7版本「此刻，将群星付之一笑」版本更新说明");
+  const duplicate = notice(1475, "「末日幻影•领航冥茫」挑战预告");
+  const activity = notice(1476, "「逐光捡金」挑战说明");
+  const list = { retcode: 0, data: { list: [{ list: [version, duplicate, activity] }], pic_list: [] } };
+  const heading = "「逐光捡金」：常驻玩法交替更新。";
+  const official = { ...version, content: "■玩法 「异相仲裁」随版本更新。 " + heading +
+    '<p>末日幻影•领航冥茫 &lt;t class="t_lc"&gt;2026/11/16 04:00:00&lt;/t&gt; - &lt;t&gt;2026/12/28 03:59:00&lt;/t&gt;</p>' +
+    "<p>虚构叙事•虚事成理 2026/11/30 04:00:00 - 2027/01/11 03:59:00</p>" +
+    "<p>混沌回忆•漆黑残响 2026/12/14 04:00:00 - 2027/01/25 03:59:00</p>" +
+    " ■关卡 虚构叙事•非公告区间 2026/11/30 04:00:00 - 2027/01/11 03:59:00" };
+  const content = { retcode: 0, data: { list: [official, { ...duplicate,
+    content: "活动时间：2026/11/16 04:00:00 - 2026/12/28 06:00:00" },
+    { ...activity, content: heading + "混沌回忆•普通说明 2026/11/20 04:00:00 - 2027/01/01 03:59:00" }], pic_list: [] } };
+  const table = buildStarrailCalendar(list, content, Date.parse("2026-11-24T10:00:00+08:00"));
+  const challenges = table.rows.filter(row => row.kind.startsWith("abyss"));
+  expect(challenges).toEqual([
+    expect.objectContaining({ kind: "abyss-3", title: duplicate.title, end: Date.parse("2026-12-28T06:00:00+08:00") }),
+    { kind: "abyss-2", title: "虚构叙事•虚事成理", start: Date.parse("2026-11-30T04:00:00+08:00"),
+      end: Date.parse("2027-01-11T03:59:00+08:00") },
+  ]);
+  const december = buildStarrailCalendar(list, content, Date.parse("2026-12-15T10:00:00+08:00"));
+  expect(december.rows).toContainEqual({ kind: "abyss-1", title: "混沌回忆•漆黑残响",
+    start: Date.parse("2026-12-14T04:00:00+08:00"), end: Date.parse("2027-01-25T03:59:00+08:00") });
+});
