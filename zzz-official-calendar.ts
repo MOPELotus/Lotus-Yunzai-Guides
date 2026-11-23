@@ -80,7 +80,12 @@ export function createZzzOfficialCalendar(options: {
     }
   }
 
-  async function lookup(): Promise<CommandReply> {
+  function originalImage(result: Extract<Result, { status: "image" }>, limit: number) {
+    if (result.reply.file.byteLength <= limit) return result.reply;
+    return `当前会话无法发送这张官方原图，请打开原图链接。\n${result.url}`;
+  }
+
+  async function lookup(limit = Infinity): Promise<CommandReply> {
     const time = now();
     if (retained && time >= retained.expiresAt) retained = undefined;
     const ttl = cached?.result.status === "image" ? 10 * minute : minute;
@@ -95,12 +100,12 @@ export function createZzzOfficialCalendar(options: {
       }).finally(() => { active = undefined; });
       result = await active;
     }
-    if (result.status === "image" && now() >= result.expiresAt) return missingCalendar;
+    if (result.status === "image") return now() < result.expiresAt ? originalImage(result, limit) : missingCalendar;
     if (result.status === "failed" && retained && now() < retained.expiresAt && (!result.url || result.url === retained.url)) {
-      return ["暂时无法刷新，以下为上次取得的官方活动日历。", retained.reply];
+      return ["暂时无法刷新，以下为上次取得的官方活动日历。", originalImage(retained, limit)];
     }
     return result.reply;
   }
 
-  return (message: string) => command.test(message.trim()) ? lookup() : undefined;
+  return (message: string, inlineImageByteLimit?: number) => command.test(message.trim()) ? lookup(inlineImageByteLimit) : undefined;
 }

@@ -13,6 +13,7 @@ type Outcome = "confirmed" | "rejected" | "unknown";
 
 export interface CalendarScheduleTarget {
   readonly groupId: number;
+  readonly inlineImageByteLimit?: number;
   send(message: MessageReply, signal: AbortSignal): Promise<Outcome>;
 }
 
@@ -28,7 +29,7 @@ export interface CalendarScheduleOptions {
   lockFile(file: string, subject: string): Promise<{ close(): void }>;
   register(cron: string, type: CalendarScheduleKind, run: () => Promise<void>): () => void | Promise<void>;
   targets(groupIds: readonly number[], signal: AbortSignal): Promise<readonly CalendarScheduleTarget[]>;
-  render(type: CalendarScheduleKind, signal: AbortSignal): Promise<MessageReply | undefined>;
+  render(type: CalendarScheduleKind, signal: AbortSignal, inlineImageByteLimit?: number): Promise<MessageReply | undefined>;
   report?(stage: "state" | "register" | "targets" | "render" | "send", outcome: Exclude<Outcome, "confirmed">): void;
   wait?(milliseconds: number, signal: AbortSignal): Promise<void>;
 }
@@ -289,18 +290,25 @@ export async function createCalendarSchedule(options: CalendarScheduleOptions): 
     }
     const queue = targets.filter(({ groupId }) => selected.delete(groupId));
     if (!queue.length || !active()) return;
-    let message: MessageReply | undefined;
-    try {
-      message = await options.render(type, signal);
-    } catch {
-      if (active()) options.report?.("render", "unknown");
-      return;
-    }
-    if (message === undefined || Array.isArray(message) && !message.length) {
-      if (active()) options.report?.("render", "rejected");
-      return;
-    }
+    const rendered = new Map<number | undefined, MessageReply | undefined>();
     for (const target of queue) {
+      if (!active()) return;
+      if (!state.whiteList.includes(target.groupId) || state.blackList.includes(target.groupId)) continue;
+      const limit = target.inlineImageByteLimit;
+      if (!rendered.has(limit)) {
+        try {
+          const message = await options.render(type, signal, limit);
+          if (message === undefined || Array.isArray(message) && !message.length) {
+            if (active()) options.report?.("render", "rejected");
+            rendered.set(limit, undefined);
+          } else rendered.set(limit, message);
+        } catch {
+          if (active()) options.report?.("render", "unknown");
+          rendered.set(limit, undefined);
+        }
+      }
+      const message = rendered.get(limit);
+      if (message === undefined) continue;
       if (!active()) return;
       if (!state.whiteList.includes(target.groupId) || state.blackList.includes(target.groupId)) continue;
       const remaining = lastDelivery === undefined ? 0 : 5000 - (performance.now() - lastDelivery);

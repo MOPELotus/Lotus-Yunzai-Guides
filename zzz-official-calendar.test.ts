@@ -92,3 +92,17 @@ test("未发布、原图缺失、远端改版及失败回退不能发送旧图�
   parameters.detail = false;
   expect(await use("%cal")).toContain("获取活动日历失败");
 });
+
+test("绝区零官方原图按会话容量发原始字节，超限改给同一官方原图链接", async () => {
+  const { use, requests, parameters, clock } = fixture();
+  expect(await use("%cal", png.byteLength)).toEqual(image);
+  expect(await use("%cal", png.byteLength - 1)).toContain(asset);
+  expect(await use("%cal")).toEqual(image);
+  expect(requests).toHaveLength(3);
+  clock.time += 11 * minute;
+  parameters.list = false;
+  expect(await use("%cal", png.byteLength - 1)).toEqual([
+    "暂时无法刷新，以下为上次取得的官方活动日历。",
+    "当前会话无法发送这张官方原图，请打开原图链接。\n" + asset,
+  ]);
+});

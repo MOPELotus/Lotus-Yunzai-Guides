@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { Job } from "node-schedule";
 import type { CommandModule } from "../../lib/commands.ts";
-import type { MessageEvent, MessageSegment } from "../../lib/messages.ts";
+import type { MessageEvent } from "../../lib/messages.ts";
 import { teamGuides } from "./team-guides.ts";
 import { createTeamResources } from "./team-resources.ts";
 import { createRoleGuides } from "./role-guides.ts";
@@ -12,7 +12,7 @@ import { createOriginalRoleResources } from "./original-role-resources.ts";
 import { createBannerTables } from "./banner-tables.ts";
 import { createAbyssReferences } from "./abyss-references.ts";
 import { createAkashaAbyss } from "./akasha-abyss.ts";
-import { createGenshinCalendar, createStarrailCalendar, createZzzCalendar } from "./calendar.ts";
+import { createGenshinCalendar, createScheduledCalendarRenderer, createStarrailCalendar, createZzzCalendar } from "./calendar.ts";
 import { createCalendarSchedule, type CalendarSchedule, type CalendarScheduleOptions } from "./calendar-schedule.ts";
 import { guideFlags, readGuidesConfiguration } from "./guide-configuration.ts";
 
@@ -77,7 +77,8 @@ export function createGuidesModule(options: {
       const command = (normalizedMessage || message).trim();
       const refresh = /^#(强制)?更新攻略资源(?:\s+(.*))?$/su.exec(command);
       if (refresh) return refreshAll(!!refresh[1], refresh[2] ?? "", context);
-      const calendar = options.genshinCalendar?.(command) ?? options.starrailCalendar?.(command) ?? options.zzzCalendar?.(command);
+      const calendar = options.genshinCalendar?.(command, inlineImageByteLimit) ??
+        options.starrailCalendar?.(command, inlineImageByteLimit) ?? options.zzzCalendar?.(command, inlineImageByteLimit);
       if (calendar !== undefined) return calendar;
       const banners = options.bannerTables?.(command);
       if (banners !== undefined) return banners;
@@ -216,15 +217,7 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
   const scheduled = guidesSchedule && await createCalendarSchedule({
     signal: refreshSignal, root: installation, lockFile,
     register: guidesSchedule.registerTask, targets: guidesSchedule.targets,
-    async render(type, active) {
-      const replies = await Promise.all([
-        type === "S" ? undefined : createGenshinCalendar({ signal: active })("#日历"),
-        type === "G" ? undefined : createStarrailCalendar({ signal: active })("#星铁日历"),
-      ]);
-      const images = replies.filter((reply): reply is Extract<MessageSegment, { type: "image" }> =>
-        typeof reply === "object" && reply !== null && "type" in reply && reply.type === "image" && "file" in reply);
-      if (images.length === (type === "*" ? 2 : 1)) return images;
-    },
+    render: createScheduledCalendarRenderer({ signal: refreshSignal }),
     report(stage, outcome) {
       console.warn(`[guides] 定时日历 ${stage} ${outcome === "unknown" ? "结果待核对" : "失败"}。`);
     },

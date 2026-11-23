@@ -191,3 +191,30 @@ test("停机等待已发出的消息回执，取消在队列中两种任务的�
   expect(rendered).toEqual(["G"]);
   expect(f.jobs.size).toBe(0);
 });
+
+test("定时日历按接收会话上限生成并复用同上限版本", async () => {
+  const rendered: (number | undefined)[] = [];
+  const sent: [number, string][] = [];
+  const limits = new Map<number, number>([[79, 17], [81, 17], [82, 6]]);
+  const f = await fixture({
+    async targets() {
+      return [77, 79, 81, 82].map(groupId => ({
+        groupId, inlineImageByteLimit: limits.get(groupId), async send(message) {
+          sent.push([groupId, String(message)]);
+          return "confirmed";
+        },
+      }));
+    },
+    async render(type, _active, limit) {
+      expect(type).toBe("*");
+      rendered.push(limit);
+      return limit === 6 ? "日历文字" : String(limit ?? "不限");
+    },
+    async wait() {},
+  });
+  await f.old([77, 79, 81, 82], [], [{ cron: "0 9 * * *", type: "*" }]);
+  await f.start();
+  await f.jobs.get("*:0 9 * * *")!();
+  expect(rendered).toEqual([undefined, 17, 6]);
+  expect(sent).toEqual([[77, "不限"], [79, "17"], [81, "17"], [82, "日历文字"]]);
+});

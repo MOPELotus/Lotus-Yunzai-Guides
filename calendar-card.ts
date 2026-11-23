@@ -1,7 +1,7 @@
 // Layout and colors adapted from Miao-Plugin resources/wiki/calendar.html and calendar.css (MIT).
 import { realpath } from "node:fs/promises";
 import { join } from "node:path";
-import { renderPng } from "@lotus-yunzai/skia";
+import { ImageSizeLimitError, nativeImageRasterScale, renderPng } from "@lotus-yunzai/skia";
 import { FontLibrary, loadImage, type CanvasRenderingContext2D as Context, type Image } from "skia-canvas";
 import { readGuideImage } from "./role-image-files.ts";
 import { officialCalendarImage, type CalendarGame, type CalendarData, type CalendarKind, type CalendarRow } from "./calendar-data.ts";
@@ -9,7 +9,6 @@ import { genshinCalendarExtras, genshinCalendarMaterial, genshinCalendarPortrait
 
 const day = 86_400_000;
 const china = 8 * 3_600_000;
-const scale = 4;
 const weekdays = "日一二三四五六";
 const fontName = "LotusCalendarText";
 const numberFont = "LotusCalendarNumbers";
@@ -124,7 +123,9 @@ export async function renderCalendar(data: CalendarData, mode: "calendar" | "lis
   readonly themeDirectory?: string;
   readonly fetch?: typeof fetch;
   readonly signal?: AbortSignal;
+  readonly inlineImageByteLimit?: number;
 }) {
+  options.signal?.throwIfAborted();
   const timeline = mode === "calendar";
   const width = timeline ? 996 : 740;
   const panel = width - 40;
@@ -186,8 +187,7 @@ export async function renderCalendar(data: CalendarData, mode: "calendar" | "lis
   const things = new Map(genshin);
   const portrait = (name: string | undefined, type: "face" | "card") => name ? things.get(genshinCalendarPortrait(name, type) ?? "") : undefined;
   const localMaterial = (name: string, type: "talent" | "weekly") => things.get(genshinCalendarMaterial(name, type) ?? "");
-  return renderPng(Math.ceil(width * scale), Math.ceil(height * scale), (c) => {
-    c.scale(scale, scale);
+  const draw = (c: Context) => {
     c.fillStyle = hydro ? "#16243c" : "#181a31";
     c.fillRect(0, 0, width, height);
     if (background) c.drawImage(background, 0, 0, width, height);
@@ -329,5 +329,21 @@ export async function renderCalendar(data: CalendarData, mode: "calendar" | "lis
         }
       }
     }
-  }, "gpu");
+  };
+  const render = (scale: 2 | 4) => {
+    options.signal?.throwIfAborted();
+    return renderPng(Math.ceil(width * scale), Math.ceil(height * scale), c => {
+      c.scale(scale, scale);
+      draw(c);
+    }, "gpu", { allowHalfScale: scale === 4, renderScale: scale });
+  };
+  const limit = options.inlineImageByteLimit ?? Infinity;
+  const standard = nativeImageRasterScale() === 4;
+  const full = await render(4);
+  if (full.png.byteLength <= limit) return full;
+  if (standard && !full.reducedScaleReason) {
+    const half = await render(2);
+    if (half.png.byteLength <= limit) return half;
+  }
+  throw new ImageSizeLimitError("当前会话的图片大小上限不足以发送完整日历。");
 }
