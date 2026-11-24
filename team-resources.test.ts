@@ -133,7 +133,7 @@ test("分批从源 Git 读取配队文件，完整后切换，损坏与断网保
   }
 }, 15_000);
 
-test("缺包启动触发更新，已安装时每天北京时间三点加随机延迟执行", async () => {
+test("缺包启动触发更新，已安装时每天北京时间两点和十四点执行", async () => {
   let installed = false;
   const refresh = spyOn({ async run() { installed = true; return "current" as const; } }, "run");
   const handle = new AbortController();
@@ -151,7 +151,7 @@ test("缺包启动触发更新，已安装时每天北京时间三点加随机�
     if (!next) throw new Error("未安排下次自动更新。");
     expect(new Intl.DateTimeFormat("en-GB", {
       timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-    }).format(next.getTime())).toBe("03:00");
+    }).format(next.getTime())).toMatch(/^(02|14):00$/u);
     await Bun.sleep(10);
     expect(refresh).toHaveBeenCalledTimes(1);
     job.invoke();

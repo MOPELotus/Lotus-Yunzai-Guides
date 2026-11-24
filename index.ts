@@ -106,7 +106,6 @@ export function startTeamResourceRefresh(resources: TeamResources, signal: Abort
 
 function startResourceRefresh(resources: Pick<TeamResources, "refresh" | "initialized" | "wait">,
   signal: AbortSignal, kind: string, label: string) {
-  let timer: ReturnType<typeof setTimeout> | undefined;
   let retry: ReturnType<typeof setTimeout> | undefined;
   let delay = 60_000;
   let updating = false;
@@ -128,17 +127,14 @@ function startResourceRefresh(resources: Pick<TeamResources, "refresh" | "initia
     }
   }
   const job = new Job(`lotus-guides-${kind}-refresh-${crypto.randomUUID()}`, () => {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => { void update(); }, Math.floor(Math.random() * 3_600_000));
-    timer.unref();
+    void update();
   });
   if (!signal.aborted) {
-    job.schedule({ rule: "0 0 3 * * *", tz: "Asia/Shanghai" });
+    job.schedule({ rule: kind === "team" ? "0 0 2,14 * * *" : "0 0 5,17 * * *", tz: "Asia/Shanghai" });
     void resources.initialized().catch(() => false).then((ready) => { if (!ready) return update(); });
   }
   const stop = () => {
     job.cancel();
-    if (timer) clearTimeout(timer);
     if (retry) clearTimeout(retry);
   };
   signal.addEventListener("abort", stop, { once: true });
