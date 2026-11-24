@@ -1,3 +1,5 @@
+import { createInitializationProgress } from "../../lib/initialization-progress.ts";
+import { reportResourceProgress, type ResourceProgressCallback } from "../../lib/resource-progress.ts";
 // Source and refresh schedule adapted from Mora-Plugin apps/help.js.
 import { lstat, mkdir, mkdtemp, readdir, readlink, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
@@ -71,13 +73,14 @@ export async function verifyGuideSnapshot(directory: string, files: readonly {
   readonly path: string;
   readonly hash: string;
   readonly maxBytes: number;
-}[], signal: AbortSignal) {
+}[], signal: AbortSignal, onProgress?: ResourceProgressCallback) {
   for (let start = 0; start < files.length; start += 8) {
     signal.throwIfAborted();
     const batch = files.slice(start, start + 8);
     const valid = await Promise.all(batch.map(({ path, hash, maxBytes }) =>
       readLocalGuideBlob(directory, path, hash, maxBytes).then(Boolean)));
     signal.throwIfAborted();
+    reportResourceProgress(onProgress, signal, "guides-check", "核对攻略快照", start + batch.length, files.length);
     if (valid.some(result => !result)) return false;
   }
   return true;
@@ -104,7 +107,7 @@ function gitOptions(source: string) {
   };
 }
 
-function gitClient(directory: string, source: string, signal: AbortSignal) {
+function gitClient(directory: string, source: string, signal: AbortSignal, onProgress?: ResourceProgressCallback) {
   const binary = Bun.which("git", { PATH: process.env.PATH });
   if (!binary) throw new Error("下载攻略资源需要 Git。");
   const env = gitOptions(source);
@@ -114,15 +117,33 @@ function gitClient(directory: string, source: string, signal: AbortSignal) {
       binary, "--no-pager", "-c", "core.fsmonitor=false", "-c", `core.hooksPath=${devNull}`,
       "-c", "credential.helper=", "-c", "http.followRedirects=false", "-c", "http.version=HTTP/1.1",
       "-c", "protocol.version=2", "-c", "transfer.bundleURI=false", ...args,
-    ], { cwd: directory, env, stdin: stdin ?? "ignore", stdout: "pipe", stderr: "ignore", maxBuffer, detached: true });
+    ], { cwd: directory, env, stdin: stdin ?? "ignore", stdout: "pipe", stderr: "pipe", maxBuffer, detached: true });
     const stop = () => {
       try { process.kill(-child.pid, "SIGKILL"); } catch {
         try { child.kill("SIGKILL"); } catch { /* Git may have exited. */ }
       }
     };
     signal.addEventListener("abort", stop, { once: true });
+    const diagnostics = (async () => {
+      const reader = child.stderr.getReader();
+      const decoder = new TextDecoder();
+      let pending = "";
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          pending += decoder.decode(value, { stream: true });
+          const lines = pending.split(/[\r\n]/u);
+          pending = lines.pop() ?? "";
+          for (const line of lines) if (line.trim()) reportResourceProgress(onProgress, signal, "guides-git", line.trim().slice(0, 300));
+          if (pending.length > 4096) pending = pending.slice(-4096);
+        }
+        if (pending.trim()) reportResourceProgress(onProgress, signal, "guides-git", pending.trim().slice(0, 300));
+      } catch { /* Diagnostics must not affect Git. */ }
+      finally { reader.releaseLock(); }
+    })();
     try {
-      const [output, code] = await Promise.all([new Response(child.stdout).arrayBuffer(), child.exited]);
+      const [output, code] = await Promise.all([new Response(child.stdout).arrayBuffer(), child.exited, diagnostics]);
       signal.throwIfAborted();
       if (code !== 0 || output.byteLength > maxBuffer) throw new Error(`无法读取上游攻略资源（Git ${args[0]}）。`);
       return Buffer.from(output);
@@ -136,14 +157,15 @@ function gitClient(directory: string, source: string, signal: AbortSignal) {
   };
 }
 
-const guideFetchOptions = ["--quiet", "--no-tags", "--no-write-fetch-head", "--no-recurse-submodules", "--no-auto-maintenance",
+const guideFetchOptions = ["--progress", "--no-tags", "--no-write-fetch-head", "--no-recurse-submodules", "--no-auto-maintenance",
   "--filter=blob:none"] as const;
 function fetchGuideObjects(git: ReturnType<typeof gitClient>, arguments_: readonly string[], stdin?: Uint8Array) {
   return git(arguments_, stdin).catch(() => git(arguments_, stdin));
 }
 
-export async function prepareGuideSourceGit(directory: string, source: string, signal: AbortSignal) {
-  const git = gitClient(directory, source, signal);
+export async function prepareGuideSourceGit(directory: string, source: string, signal: AbortSignal, onProgress?: ResourceProgressCallback) {
+  reportResourceProgress(onProgress, signal, "guides-git", "同步上游攻略资源索引");
+  const git = gitClient(directory, source, signal, onProgress);
   await git(["init", "--quiet", "--bare", "--template="]);
   await git(["remote", "add", "origin", source]);
   await git(["config", "remote.origin.promisor", "true"]);
@@ -165,6 +187,8 @@ export function createTeamResources(options: {
   readonly alternatives?: readonly string[];
   readonly signal?: AbortSignal;
   readonly source?: string;
+  readonly onProgress?: ResourceProgressCallback;
+  readonly logProgress?: boolean;
 }) {
   const { root, fallback } = options;
   const source = options.source ?? guideSource;
@@ -188,14 +212,21 @@ export function createTeamResources(options: {
     const timeout = AbortSignal.timeout(180_000);
     const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
     signal.throwIfAborted();
-    await mkdir(root, { recursive: true, mode: 0o700 });
-    const lock = await lockFile(join(root, "refresh.lock"), "配队资源");
+    const terminal = options.logProgress && !options.onProgress ? createInitializationProgress("配队资源", { signal }) : undefined;
+    const onProgress = options.onProgress ?? terminal?.update;
+    let succeeded = false;
+    const report = (stage: string, message: string, completed?: number, total?: number) =>
+      reportResourceProgress(onProgress, signal, stage, message, completed, total);
+    report("guides-team", "准备配队资源");
+    let lock: Awaited<ReturnType<typeof lockFile>> | undefined;
     let temporary: string | undefined;
     try {
+      await mkdir(root, { recursive: true, mode: 0o700 });
+      lock = await lockFile(join(root, "refresh.lock"), "配队资源");
       await cleanGuideStages(root, ".refresh-");
       await writeGuideFile(pending, "");
       temporary = await mkdtemp(join(root, ".refresh-"));
-      const git = await prepareGuideSourceGit(temporary, source, signal);
+      const git = await prepareGuideSourceGit(temporary, source, signal, onProgress);
       const currentSourcePath = moraSourcePath(sourcePath);
       const resolveTree = async (path: string) => (await git(["rev-parse", "--verify", `${guideSourceRef}:${path}`])).toString().trim();
       const renamedTree = await resolveTree(currentSourcePath).catch(() => undefined);
@@ -205,9 +236,10 @@ export function createTeamResources(options: {
       const previous = await managedSnapshot(root);
       const objects = readGitTree((await git(["ls-tree", "-r", "-z", guideSourceRef, "--", path])).toString("utf8"), path);
       if (!force && previous?.tree === tree && await verifyGuideSnapshot(previous.directory,
-        [...objects].map(([path, hash]) => ({ path, hash, maxBytes: path === indexPath ? maxIndex : maxImage })), signal)) {
+        [...objects].map(([path, hash]) => ({ path, hash, maxBytes: path === indexPath ? maxIndex : maxImage })), signal, onProgress)) {
         await writeGuideFile(checked, "");
         await rm(pending, { force: true });
+        succeeded = true;
         return "current";
       }
 
@@ -219,7 +251,9 @@ export function createTeamResources(options: {
         known.set(hash, bytes);
       }
       const localDirectories = previous ? [previous.directory, ...fallbacks] : fallbacks;
+      let checkedCount = 0;
       for (const [file, hash] of objects) {
+        report("guides-team-check", "核对配队缓存", checkedCount++, objects.size);
         if (known.has(hash)) continue;
         const limit = file === indexPath ? maxIndex : maxImage;
         let bytes = await readLocalGuideBlob(objectDirectory, hash, hash, limit);
@@ -229,11 +263,13 @@ export function createTeamResources(options: {
         }
         if (bytes) retain(hash, bytes);
       }
+      report("guides-team-check", "配队缓存核对完成", objects.size, objects.size);
       const missing = [...new Map([...objects].filter(([, hash]) => !known.has(hash)).map(([file, hash]) => [hash, file]))];
       for (let start = 0; start < missing.length; start += 8) {
         const batch = missing.slice(start, start + 8);
+        report("guides-team-download", "下载配队资源", start, missing.length);
         await fetchGuideBlobs(git, batch.map(([hash]) => hash));
-        for (const [hash, file] of batch) {
+        for (const [index, [hash, file]] of batch.entries()) {
           const bytes = await git(["cat-file", "blob", hash], undefined, file === indexPath ? maxIndex : maxImage);
           if (guideBlobId(bytes) !== hash || (file !== indexPath && !bytes.subarray(0, 8).equals(pngHeader))) {
             throw new Error("上游配队文件不完整。");
@@ -241,6 +277,7 @@ export function createTeamResources(options: {
           signal.throwIfAborted();
           retain(hash, bytes);
           await writeGuideFile(join(objectDirectory, hash), bytes);
+          report("guides-team-download", `已取得 ${file}`, start + index + 1, missing.length);
         }
       }
       const index = known.get(objects.get(indexPath)!);
@@ -250,6 +287,7 @@ export function createTeamResources(options: {
 
       const stage = join(temporary, "stage");
       let size = 0;
+      let publishedCount = 0;
       for (const [file, hash] of objects) {
         const bytes = known.get(hash);
         if (!bytes || (file !== indexPath && !bytes.subarray(0, 8).equals(pngHeader))) throw new Error("上游配队文件不完整。");
@@ -258,6 +296,7 @@ export function createTeamResources(options: {
         const target = join(stage, file);
         await mkdir(dirname(target), { recursive: true });
         await writeFile(target, bytes, { flag: "wx" });
+        report("guides-team-install", "保存配队资源", ++publishedCount, objects.size);
       }
       const next = `snapshots/${tree}-${crypto.randomUUID()}`;
       const pointer = join(temporary, "pointer");
@@ -268,12 +307,15 @@ export function createTeamResources(options: {
       await rename(pointer, join(root, "current"));
       await writeGuideFile(checked, "");
       await rm(pending, { force: true });
+      succeeded = true;
       return "updated";
     } finally {
       try {
         if (temporary) await rm(temporary, { recursive: true, force: true });
       } finally {
-        lock.close();
+        if (succeeded) terminal?.complete();
+        else terminal?.fail(signal.aborted ? "资源准备已中止" : "资源准备失败");
+        lock?.close();
       }
     }
   }

@@ -1,3 +1,4 @@
+import type { ResourceProgress } from "../../lib/resource-progress.ts";
 import { expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -66,8 +67,9 @@ done
 exec '${git}' "$@"
 `, { mode: 0o700 });
     Bun.env.PATH = [bin, savedPath].join(delimiter);
+    const progress: ResourceProgress[] = [];
     const make = () => createOriginalRoleResources({ root: store, cache, fallbacks: [legacy], source: pathToFileURL(source).href,
-      signal: controller.signal });
+      signal: controller.signal, onProgress(event) { progress.push(event); } });
     const initial = make();
     await writeFile(fail, "");
     await expect(initial.refresh()).rejects.toThrow("Git -c");
@@ -79,6 +81,9 @@ exec '${git}' "$@"
     const resumed = make();
     expect(await resumed.refresh()).toBe("updated");
     const installed = (await resumed.current())!.directory;
+    const installedProgress = progress.filter(event => event.stage === "guides-roles-install");
+    expect(installedProgress.at(-1)).toMatchObject({ completed: supported.length + 1, total: supported.length + 1 });
+    expect(progress.some(event => event.stage === "guides-git")).toBe(true);
     for (const path of supported) expect(await readFile(join(installed, path))).toEqual(image(path));
     expect(await Bun.file(join(installed, "Genshin/Abyss/unrelated.png")).exists()).toBe(false);
     const requested = (await readFile(trace, "utf8")).trim().split("\n");
