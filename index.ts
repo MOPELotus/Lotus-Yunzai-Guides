@@ -1,3 +1,4 @@
+import { createGuideResourcePreparation } from "./initialize-resources.ts";
 import type { ResourceProgressCallback } from "../../lib/resource-progress.ts";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -131,7 +132,9 @@ function startResourceRefresh(resources: Pick<TeamResources, "refresh" | "initia
   });
   if (!signal.aborted) {
     job.schedule({ rule: kind === "team" ? "0 0 2,14 * * *" : "0 0 5,17 * * *", tz: "Asia/Shanghai" });
-    void resources.initialized().catch(() => false).then((ready) => { if (!ready) return update(); });
+    void resources.initialized().catch(() => false).then(ready => {
+      if (!ready && !signal.aborted) console.warn(`[guides] ${label}尚未初始化，请运行 bun run bootstrap。`);
+    });
   }
   const stop = () => {
     job.cancel();
@@ -164,19 +167,11 @@ export async function createModule({ signal, lockFile, guidesSchedule, onProgres
   const { forward, auto_update: autoUpdate } = guideFlags(await readGuidesConfiguration(installation).catch(() => ({})));
   const controller = new AbortController();
   const refreshSignal = AbortSignal.any([signal, controller.signal]);
-  const data = (path: string) => fileURLToPath(new URL(path, import.meta.url));
-  const cache = Bun.env.LOTUS_GUIDES_ROLE_DIR?.trim() || data("../../data/guides/roleGuides/");
-  const configuredPack = Bun.env.LOTUS_GUIDES_MORA_PACK_DIR?.trim();
   const guideAutomatic = !!guidesSchedule && autoUpdate;
-  const guidePack = configuredPack ? [configuredPack] : [data("../../data/guides/mora-plugin-res/"),
-    data("../mora-plugin/resources/mora-plugin-res/"), data("../../backup/plugins/mora-plugin/resources/mora-plugin-res/")];
-  const original = createOriginalRoleResources({ root: data("../../data/guides/role-origin/"),
-    cache, fallbacks: guidePack, onProgress, logProgress: true, signal: refreshSignal });
-  const bannerResources = createOriginalRoleResources({ root: data("../../data/guides/banner-origin/"),
-    cache, fallbacks: guidePack, onProgress, logProgress: true, signal: refreshSignal, scope: "banners" });
+  const data = (path: string) => fileURLToPath(new URL(path, import.meta.url));
+  const { cache, guidePack, original, bannerResources, abyssResources, resources } =
+    createGuideResourcePreparation(installation, refreshSignal, onProgress, true);
   const bannerTables = createBannerTables(bannerResources, guidePack, forward);
-  const abyssResources = createOriginalRoleResources({ root: data("../../data/guides/abyss-reference-origin/"),
-    cache, fallbacks: guidePack, onProgress, logProgress: true, signal: refreshSignal, scope: "abyss" });
   const abyssReferences = createAbyssReferences(abyssResources, guidePack, forward);
   const akashaAbyss = createAkashaAbyss({ signal: refreshSignal, themes: [
     data("../../backup/plugins/mora-plugin/resources/"), data("../mora-plugin/resources/"),
@@ -206,8 +201,6 @@ export async function createModule({ signal, lockFile, guidesSchedule, onProgres
   const starrailCalendar = createStarrailCalendar({ signal: refreshSignal });
   const genshinCalendar = createGenshinCalendar({ signal: refreshSignal });
   const zzzCalendar = createZzzCalendar({ signal: refreshSignal });
-  const resources = directory ? undefined : createTeamResources({ root, fallback: legacyDirectory,
-    alternatives: guidePack.flatMap(pack => ["gs", "Genshin"].map(game => join(pack, game, "TeamGuides"))), signal: refreshSignal, onProgress, logProgress: true });
   const refreshSources = [
     { label: "角色和进阶攻略", refresh: original.refresh },
     ...(resources ? [{ label: "配队资源", refresh: resources.refresh }] : []),
