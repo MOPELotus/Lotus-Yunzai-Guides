@@ -101,10 +101,15 @@ export function createRoleGuides(options: {
   async function lookup(game: GuideGame, role: GuideRole, update: boolean, useDefault: boolean): Promise<CommandReply> {
     const gamePath = guideGames[game];
     const suffix = game === "gs" ? "" : gamePath.pack;
+    async function overrides(root: string | undefined) {
+      const [old, renamed] = await Promise.all([
+        findGuidePack(root, role.name, suffix), findGuidePack(root, role.name, game),
+      ]);
+      return [...new Map([...old, ...renamed].map(image => [image.source, image])).values()];
+    }
     const [configured, assets, local, archived, atlas] = await Promise.all([
       collections.authors(game), rolePack(game, role.name, update),
-      findGuidePack(join(options.cache, "add_ons"), role.name, suffix),
-      findGuidePack(options.legacyAddOns, role.name, suffix),
+      overrides(join(options.cache, "add_ons")), overrides(options.legacyAddOns),
       fromAtlas(game, role.name, role.id),
     ]);
     const overrideMap = new Map([...archived, ...local].map((image) => [image.source, image]));
@@ -120,6 +125,8 @@ export function createRoleGuides(options: {
       const filename = role.name + ".jpg";
       const local = join(author.source, suffix, filename);
       const bytes = await readCollectionImage(local, update, () => collections.image(role, author, update), async () => {
+        const renamed = await readGuideImage(options.cache, join(author.source, game, filename));
+        if (renamed) return renamed;
         if (game !== "gs") return;
         const number = genshinStrategyNumber(author);
         if (number !== undefined) return legacyImage(number, filename);

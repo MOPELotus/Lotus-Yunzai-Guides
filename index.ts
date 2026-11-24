@@ -209,7 +209,7 @@ export async function createModule({ signal, lockFile, guidesSchedule }: {
   const genshinCalendar = createGenshinCalendar({ signal: refreshSignal });
   const zzzCalendar = createZzzCalendar({ signal: refreshSignal });
   const resources = directory ? undefined : createTeamResources({ root, fallback: legacyDirectory,
-    alternatives: guidePack.map(pack => join(pack, "Genshin", "TeamGuides")), signal: refreshSignal });
+    alternatives: guidePack.flatMap(pack => ["gs", "Genshin"].map(game => join(pack, game, "TeamGuides"))), signal: refreshSignal });
   const refreshSources = [
     { label: "角色和进阶攻略", refresh: original.refresh },
     ...(resources ? [{ label: "配队资源", refresh: resources.refresh }] : []),

@@ -64,19 +64,19 @@ test("三游戏保留旧攻略命令、配置源、本地覆盖及旧 Atlas，�
     const gitRoot = join(root, "upstream");
     const cache = join(root, "roleGuides");
     await put("upstream/Genshin/Roles/Guides/Asgater/钟离.png", image("钟离包"));
-    await put("upstream/StarRail/Roles/Guides/Asgater/丹恒•腾荒.png", image("腾荒包"));
+    await put("upstream/sr/Roles/Guides/Asgater/丹恒•腾荒.png", image("腾荒包"));
     await put("upstream/StarRail/Roles/Guides/Asgater/丹恒.png", image("丹恒包"));
-    await put("upstream/ZenlessZoneZero/Roles/Guides/Asgater/艾莲.png", image("艾莲包"));
+    await put("upstream/zzz/Roles/Guides/Asgater/艾莲.png", image("艾莲包"));
     await put("upstream/Genshin/Roles/RefStat/钟离.png", image("钟离参考面板"));
     await put("upstream/Genshin/Roles/YieldCurve/钟离.png", image("钟离收益曲线"));
     await put("upstream/Genshin/Roles/YieldCurve/帮助.png", image("收益曲线帮助"));
     await put("upstream/Genshin/Roles/RefStat/RefNotes.yaml", "url: https://www.miyoushe.com/ys/article/123\n钟离: {mainProp: 生命沙, viceProp: 生命, brief: 配装参考}\n");
-    await put("upstream/StarRail/Roles/RefStat/罗刹.png", image("罗刹参考面板"));
+    await put("upstream/sr/Roles/RefStat/罗刹.png", image("罗刹参考面板"));
     await put("upstream/StarRail/Roles/RefStat/帮助.png", image("星铁参考面板帮助"));
     await put("upstream/StarRail/Roles/RefStat/RefNotes.yaml", "url: https://www.miyoushe.com/sr/article/456\n");
     await put("atlas/star-rail-atlas/guide for role/1310.png", image("流萤旧 Atlas"));
     await put("atlas/zzz-atlas/角色攻略/艾莲.png", image("艾莲旧 Atlas"));
-    await put("roleGuides/add_ons/Asgater/钟离.jpg", image("钟离本地覆盖"));
+    await put("roleGuides/add_ons/Asgater/gs/钟离.jpg", image("钟离本地覆盖"));
     await put("oldStrategy/2/钟离.jpg", image("钟离旧缓存"));
     await put("config/roleGuides.yaml", `news:
 - {source: 作者, collection_id: ["1"]}

@@ -77,6 +77,12 @@ const legacyImageProcess = "image//resize,s_1200/quality,q_90/auto-orient,0/inte
 const zzzImageProcess = "image/resize,s_1200/quality,q_90/auto-orient,0/interlace,1/format,jpg";
 const materialImageProcess = "image//resize,s_1000/quality,q_80/auto-orient,0/interlace,1/format,jpg";
 
+function guidePostImages(post: Record<string, unknown>) {
+  const cover = object(post.cover).url;
+  return objects(post.image_list).filter(image => typeof image.url === "string" &&
+    image.url !== cover && String(image.format).toLowerCase() !== "gif");
+}
+
 function selectZzzImage(posts: readonly Record<string, unknown>[], name: string): string | undefined {
   const keyword = name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/gu, "");
   if (!keyword) return;
@@ -84,8 +90,8 @@ function selectZzzImage(posts: readonly Record<string, unknown>[], name: string)
     const { subject } = object(row.post);
     if (typeof subject !== "string" || !subject.replace(/【[^】]*本[^】]*】/gu, "").includes(keyword)) continue;
     let largest: { url: string; size: number } | undefined;
-    for (const image of objects(row.image_list)) {
-      if (typeof image.url !== "string" || String(image.format).toLowerCase() === "gif") continue;
+    for (const image of guidePostImages(row)) {
+      if (typeof image.url !== "string") continue;
       const size = Number(image.size) || 0;
       if (!largest || size >= largest.size) largest = { url: image.url, size };
     }
@@ -104,7 +110,7 @@ function selectImage(posts: readonly Record<string, unknown>[], role: GuideRole,
   }
   for (const row of posts) {
     const post = object(row.post);
-    const images = objects(row.image_list);
+    const images = guidePostImages(row);
     if (!images.length) continue;
     if (structured) {
       if (typeof post.structured_content !== "string") continue;

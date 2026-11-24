@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { lockFile } from "../../lib/file-lock.ts";
 import { abyssReferencePaths, abyssVersionDirectory, isAbyssReferencePath, originalAbyssVersion, requiredAbyssReferences } from "./abyss-references.ts";
 import { bannerFiles } from "./banner-tables.ts";
-import { guideGames, safeGuideName } from "./role-guide-input.ts";
+import { canonicalMoraPath, guideGames, moraSourcePath, safeGuideName } from "./role-guide-input.ts";
 import { isGuideImage, roleImageLimit, writeGuideFile } from "./role-image-files.ts";
 import { cleanGuideStages, fetchGuideBlobs, guideBlobId, guideSource, guideSourceRef,
   prepareGuideSourceGit, readLocalGuideBlob, verifyGuideSnapshot } from "./team-resources.ts";
@@ -25,10 +25,11 @@ interface Resource {
 }
 
 function sourceResources(output: Uint8Array, scope: Scope) {
-  const resources: Resource[] = [];
+  const selected = new Map<string, Resource>();
   for (const row of Buffer.from(output).toString("utf8").split("\0")) {
     const [metadata, ...rest] = row.split("\t");
-    const path = rest.join("\t");
+    const rawPath = rest.join("\t");
+    const path = canonicalMoraPath(rawPath);
     const base = sourcePaths[scope].find((candidate) => path.startsWith(candidate + "/"));
     if (!base) continue;
     const parts = path.slice(base.length + 1).split("/");
@@ -40,8 +41,9 @@ function sourceResources(output: Uint8Array, scope: Scope) {
     if (!notes && !/\.(?:png|jpe?g|webp)$/iu.test(file)) continue;
     const hash = /^100644 blob ([0-9a-f]{40})$/u.exec(metadata ?? "")?.[1];
     if (!hash) throw new Error("角色原资源文件格式无效。");
-    resources.push({ path, hash, notes });
+    if (rawPath !== path || !selected.has(path)) selected.set(path, { path, hash, notes });
   }
+  const resources = [...selected.values()].sort((left, right) => left.path.localeCompare(right.path));
   const requiredAbyssFileMissing = scope === "abyss" && !requiredAbyssReferences.every(path => resources.some(item => item.path === path));
   if (!resources.some(({ notes }) => !notes) || resources.length > 4000 || requiredAbyssFileMissing ||
       scope === "banners" && resources.length !== bannerFiles.length) {
@@ -87,7 +89,7 @@ export function createOriginalRoleResources({ root, cache, fallbacks, signal, so
   readonly source?: string;
   readonly scope?: Scope;
 }) {
-  const paths = sourcePaths[scope];
+  const paths = [...new Set(sourcePaths[scope].flatMap(path => [moraSourcePath(path), path]))];
   const batchSize = scope === "abyss" ? 32 : 8;
   const objects = join(root, "objects");
   const pending = join(root, "pending");
@@ -141,7 +143,8 @@ export function createOriginalRoleResources({ root, cache, fallbacks, signal, so
           if (entry) bytes = await readLocalGuideBlob(entry.directory, entry.file, item.hash, limit(item));
           for (const directory of fallbacks) {
             if (bytes && valid(item, bytes)) break;
-            bytes = await readLocalGuideBlob(directory, item.path, item.hash, limit(item));
+            bytes = await readLocalGuideBlob(directory, item.path, item.hash, limit(item)) ??
+              await readLocalGuideBlob(directory, moraSourcePath(item.path), item.hash, limit(item));
           }
           if (bytes && valid(item, bytes)) await writeGuideFile(join(objects, item.hash), bytes);
           else missing.push(item);

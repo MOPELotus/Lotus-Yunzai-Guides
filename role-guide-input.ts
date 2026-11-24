@@ -11,6 +11,17 @@ export const guideGames = {
 } as const;
 export type GuideGame = keyof typeof guideGames;
 
+const moraPackNames = Object.fromEntries(Object.entries(guideGames).map(([game, { pack }]) => [pack, game]));
+const legacyMoraPackNames = Object.fromEntries(Object.entries(guideGames).map(([game, { pack }]) => [game, pack]));
+
+export function moraSourcePath(path: string) {
+  return path.replace(/^(Genshin|StarRail|ZenlessZoneZero)(?=\/|$)/u, pack => moraPackNames[pack] ?? pack);
+}
+
+export function canonicalMoraPath(path: string) {
+  return path.replace(/^(gs|sr|zzz)(?=\/|$)/u, game => legacyMoraPackNames[game] ?? game);
+}
+
 const travelers = ["风主", "岩主", "雷主", "草主", "水主", "火主", "冰主"];
 const trailblazers = [
   ["物", 8001, ["物", "物理", "毁灭"]],

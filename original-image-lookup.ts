@@ -1,4 +1,5 @@
 import type { OriginalRoleResources } from "./original-role-resources.ts";
+import { moraSourcePath } from "./role-guide-input.ts";
 import { readGuideImage } from "./role-image-files.ts";
 
 export function createOriginalImageLookup(resources: Pick<OriginalRoleResources, "current" | "refresh">, fallbacks: readonly string[]) {
@@ -6,7 +7,10 @@ export function createOriginalImageLookup(resources: Pick<OriginalRoleResources,
 
   return async (files: readonly string[], refreshMissing = true) => {
     async function read(directory: string) {
-      const list = await Promise.all(files.map(file => readGuideImage(directory, file)));
+      const list = await Promise.all(files.map(async file => {
+        const current = moraSourcePath(file);
+        return await readGuideImage(directory, current) ?? (current === file ? undefined : readGuideImage(directory, file));
+      }));
       return {
         images: list.filter(bytes => bytes !== undefined).map(file => ({ type: "image" as const, file })),
         missing: files.filter((_, index) => list[index] === undefined),

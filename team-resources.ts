@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { lockFile } from "../../lib/file-lock.ts";
 import { indexedTeamImages, pngHeader, readResource, teamGuideAuthors } from "./team-guides.ts";
 import { writeGuideFile } from "./role-image-files.ts";
+import { moraSourcePath } from "./role-guide-input.ts";
 
 export const guideSource = "https://gitee.com/Rrrrrrray/mora-plugin-res.git";
 export const guideSourceRef = "refs/heads/master";
@@ -25,13 +26,13 @@ function resourcePaths(file: string): boolean {
     !!name && !/[\\\u0000-\u001f\u007f]/u.test(name) && name.endsWith(".png");
 }
 
-function readGitTree(output: string): Map<string, string> {
+function readGitTree(output: string, path: string): Map<string, string> {
   const objects = new Map<string, string>();
   for (const line of output.split("\0")) {
     if (!line) continue;
     const [metadata, source] = line.split("\t", 2);
-    if (!source?.startsWith(`${sourcePath}/`)) throw new Error("配队资源路径无效。");
-    const file = source.slice(sourcePath.length + 1);
+    if (!source?.startsWith(`${path}/`)) throw new Error("配队资源路径无效。");
+    const file = source.slice(path.length + 1);
     if (!resourcePaths(file)) continue;
     const id = /^100644 blob ([0-9a-f]{40})$/u.exec(metadata ?? "")?.[1];
     if (!id) throw new Error("配队资源须为原仓库的普通文件。");
@@ -195,10 +196,14 @@ export function createTeamResources(options: {
       await writeGuideFile(pending, "");
       temporary = await mkdtemp(join(root, ".refresh-"));
       const git = await prepareGuideSourceGit(temporary, source, signal);
-      const tree = (await git(["rev-parse", "--verify", `${guideSourceRef}:${sourcePath}`])).toString().trim();
+      const currentSourcePath = moraSourcePath(sourcePath);
+      const resolveTree = async (path: string) => (await git(["rev-parse", "--verify", `${guideSourceRef}:${path}`])).toString().trim();
+      const renamedTree = await resolveTree(currentSourcePath).catch(() => undefined);
+      const path = renamedTree ? currentSourcePath : sourcePath;
+      const tree = renamedTree ?? await resolveTree(path);
       if (!gitId.test(tree)) throw new Error("上游配队目录无效。");
       const previous = await managedSnapshot(root);
-      const objects = readGitTree((await git(["ls-tree", "-r", "-z", guideSourceRef, "--", sourcePath])).toString("utf8"));
+      const objects = readGitTree((await git(["ls-tree", "-r", "-z", guideSourceRef, "--", path])).toString("utf8"), path);
       if (!force && previous?.tree === tree && await verifyGuideSnapshot(previous.directory,
         [...objects].map(([path, hash]) => ({ path, hash, maxBytes: path === indexPath ? maxIndex : maxImage })), signal)) {
         await writeGuideFile(checked, "");

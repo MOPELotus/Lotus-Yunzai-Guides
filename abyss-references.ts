@@ -3,7 +3,7 @@ import { basename, join } from "node:path";
 import type { CommandReply } from "../../lib/commands.ts";
 import { createOriginalImageLookup } from "./original-image-lookup.ts";
 import type { OriginalRoleResources } from "./original-role-resources.ts";
-import { safeGuideName } from "./role-guide-input.ts";
+import { moraSourcePath, safeGuideName } from "./role-guide-input.ts";
 import { readGuideImage } from "./role-image-files.ts";
 
 export const abyssVersionDirectory = "Genshin/Abyss/Version";
@@ -47,10 +47,14 @@ export function createAbyssReferences(resources: Pick<OriginalRoleResources, "cu
     }
     const relative = `${abyssVersionDirectory}/${version}`;
     async function read(directory: string) {
-      const entries = await readdir(join(directory, relative), { withFileTypes: true }).catch(() => []);
-      const files = entries.filter(entry => entry.isFile() && versionImage(version, entry.name)).map(entry => entry.name).sort();
-      const images = await Promise.all(files.map(file => readGuideImage(directory, `${relative}/${file}`)));
-      return images.filter(image => image !== undefined).map(file => ({ type: "image" as const, file }));
+      for (const path of [moraSourcePath(relative), relative]) {
+        const entries = await readdir(join(directory, path), { withFileTypes: true }).catch(() => []);
+        const files = entries.filter(entry => entry.isFile() && versionImage(version, entry.name)).map(entry => entry.name).sort();
+        const images = (await Promise.all(files.map(file => readGuideImage(directory, `${path}/${file}`))))
+          .filter(image => image !== undefined).map(file => ({ type: "image" as const, file }));
+        if (images.length) return images;
+      }
+      return [];
     }
 
     const current = await resources.current();

@@ -102,6 +102,12 @@ test("分批从源 Git 读取配队文件，完整后切换，损坏与断网保
     expect(await readFile(join(updated, "茗血茶", "万达国际.png"))).toEqual(nextImage);
     expect(await readFile(join(initial, "茗血茶", "万达国际.png"))).toEqual(PNG);
 
+    await mkdir(join(upstream, "gs"));
+    await rename(team, join(upstream, "gs", "TeamGuides"));
+    commit("目录改名");
+    expect(await resources.refresh()).toBe("current");
+    expect(await resources.directory()).toBe(updated);
+
     const registry = new CommandRegistry();
     registry.registerModule(createGuidesModule({ directory: fallback, resources }));
     const update = "#更新配队资源";

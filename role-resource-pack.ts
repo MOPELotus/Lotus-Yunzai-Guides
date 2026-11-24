@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { lockFile } from "../../lib/file-lock.ts";
-import { guideGames, safeGuideName, type GuideGame } from "./role-guide-input.ts";
+import { guideGames, moraSourcePath, safeGuideName, type GuideGame } from "./role-guide-input.ts";
 import { findGuidePack, isGuideImage, matchesGuideImage, readGuideFile, roleImageLimit, writeGuideFile, type GuideImage } from "./role-image-files.ts";
 import { fetchGuideBlobs, guideBlobId, guideSourceRef, guideSource, prepareGuideSourceGit } from "./team-resources.ts";
 
@@ -83,8 +83,12 @@ export function createRoleResourcePack(options: {
   const fallbacks = typeof options.fallback === "string" ? [options.fallback] : options.fallback ?? [];
 
   async function directoryFiles(root: string, game: GuideGame, name: string) {
-    const local = join(root, guideGames[game].pack, "Roles");
-    return options.references ? readReferenceFallback(local, game, name) : findGuidePack(join(local, "Guides"), name);
+    for (const folder of [game, guideGames[game].pack]) {
+      const local = join(root, folder, "Roles");
+      const files = await (options.references ? readReferenceFallback(local, game, name) : findGuidePack(join(local, "Guides"), name));
+      if (hasImage(files)) return files;
+    }
+    return [];
   }
 
   async function localFiles(game: GuideGame, name: string) {
@@ -112,20 +116,24 @@ export function createRoleResourcePack(options: {
         if (!force && current && Date.now() - current.checkedAt < refreshAfter) return current.images;
         temporary = await mkdtemp(join(directory, ".refresh-"));
         const git = await prepareGuideSourceGit(temporary, options.upstream ?? guideSource, signal);
-        const path = options.references ? `${gamePath}/Roles` : `${gamePath}/Roles/Guides`;
-        const paths = options.references ? [`${path}/RefStat`, `${path}/YieldCurve`] : [path];
+        const originalPath = options.references ? `${gamePath}/Roles` : `${gamePath}/Roles/Guides`;
+        const names = [moraSourcePath(originalPath), originalPath];
+        const paths = options.references ? names.flatMap(path => [`${path}/RefStat`, `${path}/YieldCurve`]) : names;
         const index = (await git(["ls-tree", "-r", "-z", guideSourceRef, "--", ...paths])).toString("utf8");
         const files = new Map<string, string>();
+        const renamed = new Set<string>();
         for (const line of index.split("\0")) {
           const [metadata, file] = line.split("\t", 2);
-          if (!file?.startsWith(path + "/")) continue;
+          const path = names.find(name => file?.startsWith(name + "/"));
+          if (!path || !file) continue;
           const [author, namePart, ...rest] = file.slice(path.length + 1).split("/");
           if (!author || !safeGuideName(author) || !namePart || !safeGuideName(namePart) || rest.length) continue;
           const source = options.references ? referenceSource(game, name, author, namePart) : matchesGuideImage(namePart, name) ? author : undefined;
-          if (!source || files.has(source)) continue;
+          if (!source || renamed.has(source) || (path === originalPath && files.has(source))) continue;
           const hash = /^100644 blob ([0-9a-f]{40})$/u.exec(metadata ?? "")?.[1];
           if (!hash) throw new Error("角色攻略原图格式无效。");
           files.set(source, hash);
+          if (path !== originalPath) renamed.add(source);
         }
         if (files.size > 24) throw new Error("角色攻略来源数超限。");
         const persisted = new Map<string, Buffer>();

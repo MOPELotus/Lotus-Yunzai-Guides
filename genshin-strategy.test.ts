@@ -35,7 +35,12 @@ test("原神编号攻略读取原作者和旧缓存，默认入口保留普通�
         image_list: [{ image_id: "some-id", url: "https://upload-bbs.miyoushe.com/kokomi-4.png" }],
       }] : id === 1582613 ? [{
         post: { subject: "【早柚】" },
-        image_list: [{ size: 200, url: "https://upload-bbs.miyoushe.com/sayu-5.png" }],
+        cover: { url: "https://upload-bbs.miyoushe.com/cover.png" },
+        image_list: [
+          { size: 900, url: "https://upload-bbs.miyoushe.com/cover.png" },
+          { size: 800, format: "GIF", url: "https://upload-bbs.miyoushe.com/sayu.gif" },
+          { size: 200, url: "https://upload-bbs.miyoushe.com/sayu-5.png" },
+        ],
       }] : [];
       return Response.json({ retcode: 0, data: { posts } });
     }

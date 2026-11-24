@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createOriginalRoleResources } from "./original-role-resources.ts";
+import { moraSourcePath } from "./role-guide-input.ts";
 import { guideBlobId } from "./team-resources.ts";
 
 const git = Bun.which("git");
@@ -33,7 +34,7 @@ test.skipIf(!git || process.platform === "win32")("角色首装复用原目录�
   }
   const controller = new AbortController();
   try {
-    for (const path of supported) await put(join(source, path), image(path));
+    for (const [index, path] of supported.entries()) await put(join(source, index % 2 ? moraSourcePath(path) : path), image(path));
     await put(join(source, "Genshin/Roles/RefStat/RefNotes.yaml"), "钟离: {}\n");
     await put(join(source, "Genshin/Abyss/unrelated.png"), image("unrelated"));
     await put(join(legacy, supported[0]!), image(supported[0]!));
@@ -87,7 +88,7 @@ exec '${git}' "$@"
     expect(await make().initialized()).toBe(true);
 
     const updated = image("更新原图");
-    await put(join(source, supported[0]!), updated);
+    await put(join(source, moraSourcePath(supported[0]!)), updated);
     await put(join(source, "Genshin/Abyss/unrelated.png"), image("irrelevant"));
     run("add", "--all");
     run("commit", "--quiet", "-m", "update");

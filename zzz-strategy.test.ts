@@ -38,7 +38,8 @@ test("绝区零编号使用原站与准确作者缓存，全部保留原顺序�
       });
       const posts = id === "2727116" ? [
         { post: { subject: "【艾莲版本】其他角色" }, image_list: [fields("version-block.png", 3000)] },
-        { post: { subject: "【2.1版本】艾莲乔" }, image_list: [fields("gif.gif", 90000, "gif"),
+        { post: { subject: "【2.1版本】艾莲乔" }, cover: fields("cover.png", 100000),
+          image_list: [fields("cover.png", 100000), fields("gif.gif", 90000, "gif"),
           fields("small.png", 10), fields("source2-" + revision + ".png", 100)] },
       ] : [];
       return Response.json({ retcode: 0, data: { posts } });

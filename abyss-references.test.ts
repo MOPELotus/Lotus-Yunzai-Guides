@@ -31,6 +31,8 @@ test.skipIf(!Bun.which("git"))("旧深渊参考从原 Git 读取 JPG 单间、�
     await Promise.all([...requiredAbyssReferences, oldWrongExtension, versionImage, unrelated,
       "Genshin/Abyss/Teams/其他作者/4.8.png"].map(path => put(upstream, path)));
     await put(legacy, floor12_1);
+    await mkdir(join(upstream, "gs"));
+    await rename(join(upstream, "Genshin", "Abyss"), join(upstream, "gs", "Abyss"));
     git("init", "--quiet", "--initial-branch=master", "--template=");
     git("config", "user.name", "Fixture");
     git("config", "user.email", "fixture@invalid");
