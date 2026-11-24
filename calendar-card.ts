@@ -1,3 +1,4 @@
+import { prepareBuiltinFonts, builtinFontFallback } from "../../packages/skia/builtin-fonts.ts";
 // Layout and colors adapted from Miao-Plugin resources/wiki/calendar.html and calendar.css (MIT).
 import { realpath } from "node:fs/promises";
 import { join } from "node:path";
@@ -87,7 +88,7 @@ function cover(c: Context, image: Image, x: number, y: number, w: number, h: num
 }
 
 function font(size: number, family: string) {
-  return `${size}px "${numberFont}", "${family}", "Noto Sans CJK SC"`;
+  return `${size}px "${numberFont}", "${family}", ${builtinFontFallback}`;
 }
 
 function text(c: Context, value: string, x: number, y: number, size: number, color: string, family: string,
@@ -126,6 +127,7 @@ export async function renderCalendar(data: CalendarData, mode: "calendar" | "lis
   readonly signal?: AbortSignal;
   readonly inlineImageByteLimit?: number;
 }) {
+  prepareBuiltinFonts();
   options.signal?.throwIfAborted();
   const timeline = mode === "calendar";
   const width = timeline ? 996 : 740;

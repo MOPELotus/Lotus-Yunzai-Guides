@@ -1,10 +1,10 @@
+import { builtinResourceDirectory } from "../../lib/builtin-resources.ts";
 import type { MessageSegment } from "../../lib/messages.ts";
 import type { AkashaCard, drawAkashaCard } from "./akasha-card.ts";
 import { resolveGuideRole } from "./role-guide-input.ts";
 import { isGuideImage, readGuideImage } from "./role-image-files.ts";
 
 const origin = "https://akashadata.com";
-const themeOrigin = "https://gitee.com/Rrrrrrray/mora-plugin/raw/e75e320de71d3743bfabae77504ce7c0928aca84/resources/";
 const sourceAge = 30 * 86_400_000;
 const refreshInterval = 10 * 60_000;
 const teamPageSize = 14;
@@ -146,7 +146,6 @@ export function createAkashaAbyss({ signal, themes = [], transport = fetch, cloc
   let pending: Promise<Source | undefined> | undefined;
   let previous: Source | undefined;
   let refreshAfter = 0;
-  const resourceCache = new Map<string, Promise<Buffer | undefined>>();
 
   async function body() {
     if (!pending && clock() >= refreshAfter) {
@@ -160,17 +159,11 @@ export function createAkashaAbyss({ signal, themes = [], transport = fetch, cloc
   }
 
   async function asset(path: string, bundled: boolean) {
-    for (const root of themes) {
+    for (const root of [...themes, builtinResourceDirectory("social/guides")]) {
       const bytes = await readGuideImage(root, path);
       if (bytes) return bytes;
     }
-    if (!bundled) return;
-    if (!resourceCache.has(path)) resourceCache.set(path,
-      fetchBytes(themeOrigin + path, 1024 * 1024, transport, signal).then(bytes =>
-        isGuideImage(bytes) ? bytes : undefined).catch(() => undefined));
-    const bytes = await resourceCache.get(path);
-    if (!bytes) resourceCache.delete(path);
-    return bytes;
+    return undefined;
   }
 
   async function reply(query: Query, inlineLimit: number): Promise<ImageReply | string | undefined> {

@@ -101,3 +101,15 @@ test("使用率用正式名称查简称头像，保留可见名称、未知名�
     count: 19, full: 40, ratio: "63:37",
   }]) });
 });
+
+test("虚空深渊帮助使用内置原图，不在首次调用下载固定素材", async () => {
+  let requests = 0;
+  const handle = createAkashaAbyss({ signal: new AbortController().signal, transport: async () => {
+    requests++;
+    throw new Error("固定帮助图不应联网");
+  } });
+  const result = await handle("#虚空深渊帮助");
+  expect(typeof result).toBe("object");
+  expect((result as { type: string }).type).toBe("image");
+  expect(requests).toBe(0);
+});

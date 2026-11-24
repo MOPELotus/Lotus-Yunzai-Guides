@@ -1,3 +1,4 @@
+import { builtinResourceDirectory } from "../../lib/builtin-resources.ts";
 import { fileURLToPath } from "node:url";
 import type { CommandReply } from "../../lib/commands.ts";
 import { ImageSizeLimitError } from "@lotus-yunzai/skia";
@@ -34,7 +35,7 @@ function formatCalendarText(table: CalendarData, label: string, title: string, r
 
 function createGameCalendar(game: CalendarGame, options: CalendarOptions = {}) {
   const config = games[game];
-  const defaultTheme = fileURLToPath(new URL(`../../data/${game === "zzz" ? "genshin" : game}/miao-theme/`, import.meta.url));
+  const defaultTheme = builtinResourceDirectory("games/miao");
   const source = createCalendarSource(game, options);
 
   async function render(list: boolean, inlineImageByteLimit?: number, signal = options.signal): Promise<CalendarReply | undefined> {
