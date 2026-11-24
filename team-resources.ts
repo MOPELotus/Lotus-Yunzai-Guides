@@ -107,12 +107,20 @@ function gitOptions(source: string) {
   };
 }
 
+async function clearGuideGitTransientFiles(directory: string) {
+  await Promise.all(["shallow.lock", "FETCH_HEAD.lock", "packed-refs.lock", "config.lock"].map(name => rm(join(directory, name), { force: true })));
+  const packDirectory = join(directory, "objects/pack");
+  const files = await readdir(packDirectory).catch(() => []);
+  await Promise.all(files.filter(name => /^(?:tmp_pack_|tmp_idx_)/u.test(name)).map(name => rm(join(packDirectory, name), { force: true })));
+}
+
 function gitClient(directory: string, source: string, signal: AbortSignal, onProgress?: ResourceProgressCallback) {
   const binary = Bun.which("git", { PATH: process.env.PATH });
   if (!binary) throw new Error("下载攻略资源需要 Git。");
   const env = gitOptions(source);
   return async (args: readonly string[], stdin?: Uint8Array, maxBuffer = maxIndex): Promise<Buffer> => {
-    signal.throwIfAborted();
+    const active = args.includes("fetch") ? AbortSignal.any([signal, AbortSignal.timeout(10 * 60_000)]) : signal;
+    active.throwIfAborted();
     const child = Bun.spawn([
       binary, "--no-pager", "-c", "core.fsmonitor=false", "-c", `core.hooksPath=${devNull}`,
       "-c", "credential.helper=", "-c", "http.followRedirects=false", "-c", "http.version=HTTP/1.1",
@@ -123,7 +131,7 @@ function gitClient(directory: string, source: string, signal: AbortSignal, onPro
         try { child.kill("SIGKILL"); } catch { /* Git may have exited. */ }
       }
     };
-    signal.addEventListener("abort", stop, { once: true });
+    active.addEventListener("abort", stop, { once: true });
     const diagnostics = (async () => {
       const reader = child.stderr.getReader();
       const decoder = new TextDecoder();
@@ -135,16 +143,16 @@ function gitClient(directory: string, source: string, signal: AbortSignal, onPro
           pending += decoder.decode(value, { stream: true });
           const lines = pending.split(/[\r\n]/u);
           pending = lines.pop() ?? "";
-          for (const line of lines) if (line.trim()) reportResourceProgress(onProgress, signal, "guides-git", line.trim().slice(0, 300));
+          for (const line of lines) if (line.trim()) reportResourceProgress(onProgress, active, "guides-git", line.trim().slice(0, 300));
           if (pending.length > 4096) pending = pending.slice(-4096);
         }
-        if (pending.trim()) reportResourceProgress(onProgress, signal, "guides-git", pending.trim().slice(0, 300));
+        if (pending.trim()) reportResourceProgress(onProgress, active, "guides-git", pending.trim().slice(0, 300));
       } catch { /* Diagnostics must not affect Git. */ }
       finally { reader.releaseLock(); }
     })();
     try {
       const [output, code] = await Promise.all([new Response(child.stdout).arrayBuffer(), child.exited, diagnostics]);
-      signal.throwIfAborted();
+      active.throwIfAborted();
       if (code !== 0 || output.byteLength > maxBuffer) throw new Error(`无法读取上游攻略资源（Git ${args[0]}）。`);
       return Buffer.from(output);
     } catch (error) {
@@ -152,7 +160,8 @@ function gitClient(directory: string, source: string, signal: AbortSignal, onPro
       await child.exited;
       throw error;
     } finally {
-      signal.removeEventListener("abort", stop);
+      active.removeEventListener("abort", stop);
+      if (active.aborted) await clearGuideGitTransientFiles(directory);
     }
   };
 }
@@ -165,17 +174,26 @@ function fetchGuideObjects(git: ReturnType<typeof gitClient>, arguments_: readon
 
 export async function prepareGuideSourceGit(directory: string, source: string, signal: AbortSignal, onProgress?: ResourceProgressCallback) {
   reportResourceProgress(onProgress, signal, "guides-git", "同步上游攻略资源索引");
+  // Callers hold their refresh lock; retain completed packs, discard interrupted writes.
+  await clearGuideGitTransientFiles(directory);
   const git = gitClient(directory, source, signal, onProgress);
   await git(["init", "--quiet", "--bare", "--template="]);
-  await git(["remote", "add", "origin", source]);
+  const remotes = (await git(["remote"])).toString("utf8").trim().split("\n");
+  await git(["remote", remotes.includes("origin") ? "set-url" : "add", "origin", source]);
   await git(["config", "remote.origin.promisor", "true"]);
   await git(["config", "remote.origin.partialclonefilter", "blob:none"]);
-  await fetchGuideObjects(git, ["fetch", ...guideFetchOptions, "--depth=1", "origin", `${guideSourceRef}:${guideSourceRef}`]);
+  await fetchGuideObjects(git, ["fetch", ...guideFetchOptions, "--depth=1", "origin", `+${guideSourceRef}:${guideSourceRef}`]);
   return git;
 }
 
 export async function fetchGuideBlobs(git: ReturnType<typeof gitClient>, hashes: Iterable<string>): Promise<void> {
-  const ids = [...new Set(hashes)];
+  const wanted = [...new Set(hashes)];
+  if (!wanted.length) return;
+  // Enumerate only locally stored objects: unlike probing a missing promisor object,
+  // --batch-all-objects does not start an implicit network fetch on older Git.
+  const stored = await git(["cat-file", "--batch-all-objects", "--batch-check=%(objectname) %(objecttype)"], undefined, 16 * 1024 * 1024);
+  const available = new Set(stored.toString("utf8").split("\n").flatMap(line => /^([0-9a-f]{40}) blob$/u.exec(line)?.slice(1) ?? []));
+  const ids = wanted.filter(hash => !available.has(hash));
   if (!ids.length) return;
   await fetchGuideObjects(git, ["-c", "fetch.negotiationAlgorithm=noop", "fetch", ...guideFetchOptions, "origin", "--stdin"],
     Buffer.from(ids.join("\n") + "\n"));
@@ -226,7 +244,9 @@ export function createTeamResources(options: {
       await cleanGuideStages(root, ".refresh-");
       await writeGuideFile(pending, "");
       temporary = await mkdtemp(join(root, ".refresh-"));
-      const git = await prepareGuideSourceGit(temporary, source, signal, onProgress);
+      const gitCache = join(root, "source-git", createHash("sha256").update(source).digest("hex").slice(0, 24));
+      await mkdir(gitCache, { recursive: true, mode: 0o700 });
+      const git = await prepareGuideSourceGit(gitCache, source, signal, onProgress);
       const currentSourcePath = moraSourcePath(sourcePath);
       const resolveTree = async (path: string) => (await git(["rev-parse", "--verify", `${guideSourceRef}:${path}`])).toString().trim();
       const renamedTree = await resolveTree(currentSourcePath).catch(() => undefined);

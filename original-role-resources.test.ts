@@ -22,9 +22,12 @@ test.skipIf(!git || process.platform === "win32")("角色首装复用原目录�
   const trace = join(root, "requests");
   const fail = join(root, "outage");
   const first = join(root, "first");
+  const hold = join(root, "hold");
+  const waiting = join(root, "waiting");
+  const childPid = join(root, "child-pid");
   const supported = ["Genshin/Roles/Guides/作者/钟离.png", "Genshin/Roles/RefStat/钟离.png",
     "Genshin/Roles/YieldCurve/钟离.png", "StarRail/Roles/Guides/作者/流萤.png", "StarRail/Roles/RefStat/流萤.png",
-    ...Array.from({ length: 8 }, (_, i) => `ZenlessZoneZero/Roles/Guides/作者/代理人${i}.png`)];
+    ...Array.from({ length: 72 }, (_, i) => `ZenlessZoneZero/Roles/Guides/作者/代理人${i}.png`)];
   async function put(file: string, bytes: string | Buffer) {
     await mkdir(dirname(file), { recursive: true });
     await writeFile(file, bytes);
@@ -54,9 +57,11 @@ test.skipIf(!git || process.platform === "win32")("角色首装复用原目录�
 for arg do
   if [ "$arg" = "--stdin" ]; then
     if [ -f '${fail}' ] && [ -f '${first}' ]; then exit 1; fi
+    if [ -f '${hold}' ]; then echo $$ > '${childPid}'; touch '${waiting}'; sleep 30; fi
     req='${trace}'.$$
     cat > "$req"
     cat "$req" >> '${trace}'
+    wc -l < "$req" >> '${trace}.batches'
     touch '${first}'
     '${git}' "$@" < "$req"
     result=$?
@@ -76,11 +81,16 @@ exec '${git}' "$@"
     expect(await initial.current()).toBeUndefined();
     expect(await make().initialized()).toBe(false);
     const sent = (await readFile(trace, "utf8")).trim().split("\n");
-    expect(sent.length).toBeGreaterThan(0);
+    expect(sent.length).toBe(62);
+    const savedPacks = new Bun.Glob("source-git/*/objects/pack/*.pack");
+    expect([...savedPacks.scanSync(store)].length).toBeGreaterThan(0);
+    // Even if publication-side objects are gone, the completed Git pack must survive retry.
+    await rm(join(store, "objects"), { recursive: true, force: true });
     await rm(fail);
     const resumed = make();
     expect(await resumed.refresh()).toBe("updated");
     const installed = (await resumed.current())!.directory;
+    expect((await readFile(`${trace}.batches`, "utf8")).trim().split("\n").map(Number)).toEqual([62, 14]);
     const installedProgress = progress.filter(event => event.stage === "guides-roles-install");
     expect(installedProgress.at(-1)).toMatchObject({ completed: supported.length + 1, total: supported.length + 1 });
     expect(progress.some(event => event.stage === "guides-git")).toBe(true);
@@ -112,8 +122,29 @@ exec '${git}' "$@"
     const repaired = (await resumed.current())!.directory;
     expect(await readFile(join(repaired, missing))).toEqual(image(missing));
     expect(await readFile(join(repaired, corrupted))).toEqual(image(corrupted));
-    expect((await readFile(trace, "utf8")).slice(beforeRepair.length).trim()).toBe(guideBlobId(image(corrupted)));
+    expect((await readFile(trace, "utf8")).slice(beforeRepair.length).trim()).toBe("");
     expect(await resumed.refresh()).toBe("current");
+    const stable = (await resumed.current())!.directory;
+    await put(join(source, moraSourcePath(supported[0]!)), image("取消中的更新"));
+    run("add", "--all");
+    run("commit", "--quiet", "-m", "cancel-fixture");
+    await writeFile(hold, "");
+    const cancellation = new AbortController();
+    const cancelled = createOriginalRoleResources({ root: store, cache, fallbacks: [], source: pathToFileURL(source).href, signal: cancellation.signal });
+    const work = cancelled.refresh();
+    void work.catch(() => {});
+    for (let i = 0; i < 100 && !await Bun.file(waiting).exists(); i++) await Bun.sleep(10);
+    expect(await Bun.file(waiting).exists()).toBe(true);
+    const pid = Number(await readFile(childPid, "utf8"));
+    const sourceCache = [...new Bun.Glob("source-git/*").scanSync({ cwd: store, onlyFiles: false })][0]!;
+    const staleLock = join(store, sourceCache, "shallow.lock");
+    await writeFile(staleLock, "interrupted public fetch");
+    cancellation.abort(new Error("取消下载验收"));
+    await expect(work).rejects.toThrow("取消下载验收");
+    expect(() => process.kill(pid, 0)).toThrow();
+    expect(await Bun.file(staleLock).exists()).toBe(false);
+    expect((await cancelled.current())!.directory).toBe(stable);
+    expect(await readFile(join(stable, supported[0]!))).toEqual(updated);
   } finally {
     controller.abort();
     if (savedPath === undefined) delete Bun.env.PATH;

@@ -94,7 +94,7 @@ export function createOriginalRoleResources({ root, cache, fallbacks, signal, so
   readonly logProgress?: boolean;
 }) {
   const paths = [...new Set(sourcePaths[scope].flatMap(path => [moraSourcePath(path), path]))];
-  const batchSize = scope === "abyss" ? 32 : 8;
+  const batchSize = scope === "roles" ? 64 : 32;
   const objects = join(root, "objects");
   const pending = join(root, "pending");
   const checked = join(root, "checked");
@@ -112,7 +112,7 @@ export function createOriginalRoleResources({ root, cache, fallbacks, signal, so
   }
 
   async function download(): Promise<"updated" | "current"> {
-    const attempt = AbortSignal.any([signal, AbortSignal.timeout(scope === "roles" ? 20 * 60 * 1000 : 75_000)]);
+    const attempt = AbortSignal.any([signal, AbortSignal.timeout(scope === "roles" ? 60 * 60 * 1000 : 10 * 60_000)]);
     attempt.throwIfAborted();
     const labels = { roles: "角色攻略", banners: "复刻表", abyss: "深渊参考" };
     const terminal = logProgress && !configuredProgress ? createInitializationProgress(labels[scope], { signal: attempt }) : undefined;
@@ -130,7 +130,9 @@ export function createOriginalRoleResources({ root, cache, fallbacks, signal, so
       await cleanGuideStages(root, ".install-");
       await writeGuideFile(pending, "");
       temporary = await mkdtemp(join(root, ".install-"));
-      const git = await prepareGuideSourceGit(temporary, source, attempt, onProgress);
+      const gitCache = join(root, "source-git", createHash("sha256").update(source).digest("hex").slice(0, 24));
+      await mkdir(gitCache, { recursive: true, mode: 0o700 });
+      const git = await prepareGuideSourceGit(gitCache, source, attempt, onProgress);
       const resources = sourceResources(await git(["ls-tree", "-r", "-z", guideSourceRef, "--", ...paths]), scope);
       const tree = createHash("sha1").update(JSON.stringify(resources)).digest("hex");
       const previous = await current();
