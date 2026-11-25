@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import { constants, renameSync } from "node:fs";
 import { mkdir, open, unlink } from "node:fs/promises";
 import { join } from "node:path";
@@ -70,7 +73,7 @@ const maxStateBytes = 128 * 1024;
 const maxGroups = 1024;
 const maxTasks = 64;
 const maxPrompts = 256;
-const labels = { S: "星铁日历", G: "原神日历", "*": "原神和星铁日历" } as const;
+const labels = { S: $t("calendar-schedule.text_e9905d6bf8"), G: $t("calendar-schedule.text_f3ad512a40"), "*": $t("calendar-schedule.text_80e4debfc8") } as const;
 
 export function matchesCalendarScheduleCommand(message: string): boolean {
   return oneStep.test(message) || addTask.test(message);
@@ -101,23 +104,23 @@ function task(cron: unknown, type: unknown): Task | undefined {
 }
 
 function groupList(value: unknown): readonly number[] {
-  if (!Array.isArray(value) || value.length > maxGroups) throw new Error("群聊名单无效。");
+  if (!Array.isArray(value) || value.length > maxGroups) throw new Error($t("calendar-schedule.text_e153d8f992"));
   const groups = new Set<number>();
   for (const entry of value) {
     const id = groupId(entry);
-    if (id === undefined) throw new Error("群聊名单包含无效群号。");
+    if (id === undefined) throw new Error($t("calendar-schedule.text_4742cbb6a9"));
     groups.add(id);
   }
   return [...groups];
 }
 
 function taskList(value: unknown): readonly Task[] {
-  if (!Array.isArray(value) || value.length > maxTasks) throw new Error("日历任务列表无效。");
+  if (!Array.isArray(value) || value.length > maxTasks) throw new Error($t("calendar-schedule.text_5205fa08db"));
   const tasks = new Map<string, Task>();
   for (const entry of value) {
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new Error("日历任务无效。");
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new Error($t("calendar-schedule.text_b261acfe28"));
     const valid = task(entry.cron, entry.type);
-    if (!valid) throw new Error("日历任务时间或类型无效。");
+    if (!valid) throw new Error($t("calendar-schedule.text_b7839603ed"));
     const key = taskKey(valid);
     if (!tasks.has(key)) tasks.set(key, valid);
   }
@@ -132,7 +135,7 @@ async function readSource(file: string): Promise<string | undefined> {
   if (!source) return;
   try {
     const metadata = await source.stat();
-    if (!metadata.isFile() || metadata.size > maxStateBytes) throw new Error("日历状态文件无效。");
+    if (!metadata.isFile() || metadata.size > maxStateBytes) throw new Error($t("calendar-schedule.text_71d9706d5e"));
     const buffer = Buffer.alloc(metadata.size + 1);
     let length = 0;
     while (length < buffer.length) {
@@ -140,7 +143,7 @@ async function readSource(file: string): Promise<string | undefined> {
       if (bytesRead === 0) break;
       length += bytesRead;
     }
-    if (length !== metadata.size) throw new Error("日历状态文件读取期间已变更。");
+    if (length !== metadata.size) throw new Error($t("calendar-schedule.text_90d8c13fb9"));
     return new TextDecoder("utf-8", { fatal: true }).decode(buffer.subarray(0, length));
   } finally {
     await source.close();
@@ -152,7 +155,7 @@ function stateRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function currentState(data: unknown): State {
-  if (!stateRecord(data) || data.version !== 1) throw new Error("日历状态版本无效。");
+  if (!stateRecord(data) || data.version !== 1) throw new Error($t("calendar-schedule.text_b842be8a1b"));
   return { version: 1, whiteList: groupList(data.whiteList), blackList: groupList(data.blackList), tasks: taskList(data.tasks) };
 }
 
@@ -175,12 +178,12 @@ function settingsOf({ whiteList, blackList, tasks }: State): CalendarScheduleSet
 
 export async function prepareLegacyCalendar(file: string) {
   const source = await readSource(file);
-  if (source === undefined) throw new Error("未找到新版定时日历副本。");
+  if (source === undefined) throw new Error($t("calendar-schedule.text_6fcdb835e0"));
   const data: unknown = JSON.parse(source);
   if (!stateRecord(data) || Object.keys(data).some((key) => !["version", "whiteList", "blackList", "tasks"].includes(key)) ||
       !Array.isArray(data.tasks) || data.tasks.some((entry: unknown) =>
         !stateRecord(entry) || Object.keys(entry).some((key) => key !== "cron" && key !== "type"))) {
-    throw new Error("日历副本格式无效或包含旧版不能表示的配置。");
+    throw new Error($t("calendar-schedule.text_696e51e73c"));
   }
   const state = currentState(data);
   const { whiteList, blackList, tasks } = state;
@@ -223,7 +226,7 @@ function calendarScheduleStore(options: CalendarScheduleOptions) {
       signal.throwIfAborted();
       if (canWrite && !canWrite()) throw new GuideSettingsError("permission");
       await mkdir(directory, { recursive: true, mode: 0o700 });
-      const lock = await options.lockFile(join(directory, ".calendar-schedule.sqlite"), "定时日历");
+      const lock = await options.lockFile(join(directory, ".calendar-schedule.sqlite"), $t("calendar-schedule.text_2b63a57e40"));
       try {
         signal.throwIfAborted();
         const previous = await sources();
@@ -232,7 +235,7 @@ function calendarScheduleStore(options: CalendarScheduleOptions) {
         if (canWrite && !canWrite()) throw new GuideSettingsError("permission");
         if (state === current) return { state, changed: false };
         const bytes = Buffer.from(JSON.stringify(state, null, 2) + "\n");
-        if (bytes.length > maxStateBytes) throw new Error("日历状态超出大小上限。");
+        if (bytes.length > maxStateBytes) throw new Error($t("calendar-schedule.text_a78bcddcec"));
         const staging = join(directory, `.${stateName}.${crypto.randomUUID()}.tmp`);
         const destination = await open(staging, "wx", 0o600);
         try {
@@ -244,7 +247,7 @@ function calendarScheduleStore(options: CalendarScheduleOptions) {
           }
           const latest = await sources();
           if (latest.length !== previous.length || latest.some((source, index) => source !== previous[index])) {
-            throw new Error("日历状态已由其他程序修改。");
+            throw new Error($t("calendar-schedule.text_1929dbad8b"));
           }
           signal.throwIfAborted();
           if (canWrite && !canWrite()) throw new GuideSettingsError("permission");
@@ -394,7 +397,7 @@ export async function createCalendarSchedule(options: CalendarScheduleOptions): 
   async function handle(message: string, owner?: CalendarScheduleOwner): Promise<string | undefined> {
     const command = matchesCalendarScheduleCommand(message);
     if (signal.aborted) return;
-    if (!owner || owner.signal.aborted || !owner.key) return command ? "只有主人可以管理定时日历。" : undefined;
+    if (!owner || owner.signal.aborted || !owner.key) return command ? $t("calendar-schedule.text_92c201c29a") : undefined;
     const active = AbortSignal.any([signal, owner.signal]);
     const pending = prompts.get(owner.key);
     if (pending && (pending.signal.aborted || pending.expires <= performance.now())) prompts.delete(owner.key);
@@ -409,7 +412,7 @@ export async function createCalendarSchedule(options: CalendarScheduleOptions): 
         list: message === "#定时添加群聊白名单" ? "whiteList" : "blackList",
         signal: owner.signal, expires: performance.now() + 60_000,
       });
-      return "请发送群号，一次一个。发送「取消」可退出。";
+      return $t("calendar-schedule.text_392b3c6616");
     }
 
     try {
@@ -417,46 +420,46 @@ export async function createCalendarSchedule(options: CalendarScheduleOptions): 
         const current = await store.read();
         if (active.aborted) return;
         return message === "#定时群聊表"
-          ? `群聊列表：\n白名单：${current.whiteList.join(", ") || "无"}\n黑名单：${current.blackList.join(", ") || "无"}`
-          : "定时任务列表：\n" + (current.tasks.map(({ cron, type }, index) =>
-            `[${index + 1}] 时间：${cron} 任务：${labels[type]}`).join("\n") || "暂无任务");
+          ? $t("calendar-schedule.text_c969a31cec", { "value1": current.whiteList.join(", ") || $t("calendar-schedule.text_484d556139"), "value2": current.blackList.join(", ") || $t("calendar-schedule.text_484d556139") })
+          : $t("calendar-schedule.text_ac9cecfcdd") + (current.tasks.map(({ cron, type }, index) =>
+            $t("calendar-schedule.text_e3bc6225fb", { "value1": index + 1, "cron": cron, "value3": labels[type] })).join("\n") || $t("calendar-schedule.text_da9688984c"));
       }
       if (addTask.test(message)) {
         const match = taskSyntax.exec(message);
         const entry = match && task(match[1], match[2]);
-        if (!entry) return '时间或任务类型无效。用法：#定时添加任务 time="0 9 * * *" S（S 星铁，G 原神，* 两者）。';
+        if (!entry) return $t("calendar-schedule.text_3fb24bd660");
         const result = await store.update((current) => {
           if (current.tasks.some((item) => taskKey(item) === taskKey(entry))) return current;
-          if (current.tasks.length >= maxTasks) throw new Error("日历任务已达上限。");
+          if (current.tasks.length >= maxTasks) throw new Error($t("calendar-schedule.text_ff959e20bb"));
           return { ...current, tasks: [...current.tasks, entry] };
         }, active);
         state = result.state;
         if (active.aborted) return;
         const scheduled = register(entry);
-        if (!scheduled) return "日历任务已保存，暂时无法启动。";
-        return result.changed ? `添加成功：在 ${entry.cron} 执行发送 ${labels[entry.type]}。` : "该定时任务已存在。";
+        if (!scheduled) return $t("calendar-schedule.text_3c7a7da6e6");
+        return result.changed ? $t("calendar-schedule.text_4b4ca7e1eb", { "cron": entry.cron, "value2": labels[entry.type] }) : $t("calendar-schedule.text_65e93eb60e");
       }
       const prompt = prompts.get(owner.key);
       if (!prompt) return;
       if (message === "取消" || message === "#取消") {
         prompts.delete(owner.key);
-        return "已取消添加群聊。";
+        return $t("calendar-schedule.text_8f64c69a95");
       }
       if (message.startsWith("#")) return;
       const id = groupId(message.trim());
-      if (id === undefined) return "请输入有效群号，或发送「取消」。";
+      if (id === undefined) return $t("calendar-schedule.text_400ae55a6d");
       prompts.delete(owner.key);
       const result = await store.update((current) => {
         if (current[prompt.list].includes(id)) return current;
-        if (current[prompt.list].length >= maxGroups) throw new Error("群聊名单已达上限。");
+        if (current[prompt.list].length >= maxGroups) throw new Error($t("calendar-schedule.text_1922089e92"));
         return { ...current, [prompt.list]: [...current[prompt.list], id] };
       }, AbortSignal.any([active, prompt.signal]));
       state = result.state;
-      if (!active.aborted && !prompt.signal.aborted) return result.changed ? `已添加：${id}` : `${id} 已在名单中。`;
+      if (!active.aborted && !prompt.signal.aborted) return result.changed ? $t("calendar-schedule.text_e669edb409", { "id": id }) : $t("calendar-schedule.text_b96173785e", { "id": id });
     } catch {
       if (!active.aborted) {
         options.report?.("state", "rejected");
-        return "定时日历配置暂不可用。";
+        return $t("calendar-schedule.text_832d4d15b4");
       }
     }
   }

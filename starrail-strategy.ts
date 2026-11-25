@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,26 +15,26 @@ import { isGuideImage, readGuideFile, roleImageLimit, writeGuideFile } from "./r
 
 // The independent plugin at 308a83d uses a different numbered list from the configurable author collections.
 const sources = [
-  { source: "初始镜像", collection_id: [1996095] },
-  { source: "小橙子阿", collection_id: [1998643] },
-  { source: "星穹中心", collection_id: [2029394, 2009142, 2038092] },
+  { source: $t("starrail-strategy.text_0d3bc5965f"), collection_id: [1996095] },
+  { source: $t("starrail-strategy.text_8176f01698"), collection_id: [1998643] },
+  { source: $t("starrail-strategy.text_21c2c12838"), collection_id: [2029394, 2009142, 2038092] },
 ] as const;
 const numbers = [1, 2, 3] as const;
 
 export const starRailStrategyHelp = [
-  "星铁编号攻略",
-  "*希儿攻略2 或 *更新希儿攻略2 可查询或刷新指定作者的原图。",
-  "*希儿攻略0 和 *希儿攻略all 均查询三个旧编号来源。图文版本以原作者发布为准。",
-  "机器人主人可用 *设置默认攻略0 至 *设置默认攻略3 切换默认来源。",
+  $t("starrail-strategy.text_33f46d3479"),
+  $t("starrail-strategy.text_3702fbbed2"),
+  $t("starrail-strategy.text_1c3982a08a"),
+  $t("starrail-strategy.text_ab047ac488"),
   ...sources.map(({ source }, index) => `${index + 1}. ${source}`),
-  "了解角色一图流及其他命令 https://www.lotusshared.cn/yunzai/",
+  $t("starrail-strategy.text_3c35fa62e2"),
 ].join("\n");
 
 const settingFile = "starrail-strategy.json";
 const ownSource = (value: unknown): value is 0 | 1 | 2 | 3 => value === 0 || value === 1 || value === 2 || value === 3;
 const trailblazerPaths = new Map([
-  ["物主", "开拓者·毁灭"], ["火主", "开拓者·存护"], ["虚数主", "开拓者·同谐"],
-  ["冰主", "开拓者·记忆"], ["雷主", "开拓者·欢愉"],
+  ["物主", $t("starrail-strategy.text_9680e7c3f3")], ["火主", $t("starrail-strategy.text_877e966392")], ["虚数主", $t("starrail-strategy.text_38d72b38b9")],
+  ["冰主", $t("starrail-strategy.text_8c62b9ec0e")], ["雷主", $t("starrail-strategy.text_474aeb4317")],
 ]);
 
 function preference(data: unknown, legacy = false) {
@@ -42,8 +45,8 @@ function preference(data: unknown, legacy = false) {
 }
 
 export const starRailStrategyOptions = [
-  { label: "现行角色攻略", value: "current" },
-  { label: "0 · 全部旧编号来源", value: 0 },
+  { label: $t("starrail-strategy.text_f58cf6cec8"), value: "current" },
+  { label: $t("starrail-strategy.text_79ee0edc7e"), value: 0 },
   ...numbers.map(value => ({ label: `${value} · ${sources[value - 1]!.source}`, value })),
 ] as const;
 type StrategyChoice = (typeof starRailStrategyOptions)[number]["value"];
@@ -90,7 +93,7 @@ export function createStarRailStrategyPreference({ cache, settingsRoot, signal }
     if (!validStarRailStrategyChoice(source)) throw new GuideSettingsError("input");
     if (!active()) throw new GuideSettingsError("permission");
     await mkdir(cache, { recursive: true, mode: 0o700 });
-    const lock = await lockFile(join(cache, ".starrail-strategy.sqlite"), "星铁攻略设置");
+    const lock = await lockFile(join(cache, ".starrail-strategy.sqlite"), $t("starrail-strategy.text_2fa06444ff"));
     try {
       const current = await get();
       if (previous !== undefined && current !== previous) throw new GuideSettingsError("conflict");
@@ -130,7 +133,7 @@ export function createStarRailStrategy(options: {
   }
 
   async function lookup(role: GuideRole, source: number, update: boolean): Promise<CommandReply | undefined> {
-    if (!ownSource(source)) return "星铁攻略编号须为 0 至 3。请发送 *攻略帮助 查看来源。";
+    if (!ownSource(source)) return $t("starrail-strategy.text_a00f8bd07b");
     const displayName = role.name;
     const name = trailblazerPaths.get(displayName) ?? displayName.replace(/^托帕[&＆]账账$/u, "托帕").replaceAll("•", "·");
     if (!safeGuideName(name)) return;
@@ -146,26 +149,26 @@ export function createStarRailStrategy(options: {
       return { author, number, bytes };
     }));
     const nodes = found.flatMap(({ author, number, bytes }) => bytes ? [
-      [`旧编号 ${number} · ${author.source} · ${displayName}攻略`, { type: "image" as const, file: bytes }],
+      [$t("starrail-strategy.text_88721e6ca7", { "number": number, "source": author.source, "displayName": displayName }), { type: "image" as const, file: bytes }],
     ] : []);
-    if (!nodes.length) return `暂无${displayName}攻略（${source === 0 ? "旧编号来源" : sources[source - 1]!.source}）。请发送 *攻略帮助 查看来源。`;
+    if (!nodes.length) return $t("starrail-strategy.text_91855e03f8", { "displayName": displayName, "value2": source === 0 ? $t("starrail-strategy.text_aacffbe8c8") : sources[source - 1]!.source });
     const missing = found.filter(result => !result.bytes).map(result => result.author.source);
-    if (missing.length) nodes.push([`暂无${missing.join("、")}的原图。`]);
+    if (missing.length) nodes.push([$t("starrail-strategy.text_7a393835c0", { "value1": missing.join("、") })]);
     if (nodes.length === 1) return nodes[0]!;
-    return options.forward === false ? nodes.flat() : { type: "forward", senderName: `${displayName}旧编号攻略`, nodes };
+    return options.forward === false ? nodes.flat() : { type: "forward", senderName: $t("starrail-strategy.text_78cc00bb61", { "displayName": displayName }), nodes };
   }
 
   function command(message: string, canManage: () => boolean): CommandReply | Promise<CommandReply> | undefined {
     if (/^#?星铁攻略(?:帮助|说明)$/u.test(message)) return starRailStrategyHelp;
     const selected = /^(?:#?星铁设置默认攻略(\d+|all)?|#设置默认攻略(0))$/iu.exec(message);
     if (!selected) return;
-    if (!canManage() || signal?.aborted) return "只有主人可以设置星铁默认攻略。";
+    if (!canManage() || signal?.aborted) return $t("starrail-strategy.text_082c97e645");
     const input = selected[1] ?? selected[2];
     const value = input?.toLowerCase() === "all" ? 0 : Number(input);
-    if (!ownSource(value)) return "请发送 *设置默认攻略0 至 *设置默认攻略3，0 表示全部旧编号来源。";
+    if (!ownSource(value)) return $t("starrail-strategy.text_eba6074f12");
     return strategy.set(value, { canWrite: canManage }).then(() =>
-      `已设置星铁默认攻略${value === 0 ? "为全部旧编号来源" : `来源 ${value}（${sources[value - 1]!.source}）`}。`,
-      () => "保存星铁默认攻略失败，请稍后再试。");
+      $t("starrail-strategy.text_454d08bcaf", { "value1": value === 0 ? $t("starrail-strategy.text_14335c16a9") : $t("starrail-strategy.text_19a4b2724d", { "value": value, "source": sources[value - 1]!.source }) }),
+      () => $t("starrail-strategy.text_d07b0469e6"));
   }
 
   return {

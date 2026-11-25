@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 // Adapted from Miao-Plugin apps/wiki/Calendar.js, CalendarSr.js and CalendarZZZ.js (MIT).
 import { withReadRetries } from "@lotus-yunzai/http";
 export const calendarListUrl = "https://hkrpg-api.mihoyo.com/common/hkrpg_cn/announcement/api/getAnnList?game=hkrpg&game_biz=hkrpg_cn&lang=zh-cn&auth_appid=announcement&authkey_ver=1&bundle_id=hkrpg_cn&channel_id=1&level=65&platform=pc&region=prod_gf_cn&sdk_presentation_style=fullscreen&sdk_screen_transparent=true&sign_type=2&uid=100000000";
@@ -104,7 +107,7 @@ export function officialCalendarImage(value: unknown) {
 function publicData(value: unknown, keys: readonly string[]) {
   const response = record(value);
   const data = record(response.data);
-  if (response.retcode !== 0 || !keys.every((key) => Array.isArray(data[key]))) throw new Error("游戏公告响应格式变化。");
+  if (response.retcode !== 0 || !keys.every((key) => Array.isArray(data[key]))) throw new Error($t("calendar-data.text_c7e9daf5db"));
   return data;
 }
 
@@ -294,7 +297,7 @@ function zzzChallengeCycles(published: readonly CalendarRow[], versionDates: rea
     const kind = cycle % 2 === 0 ? "abyss-1" : "abyss-2";
     if (published.some((row) => row.kind === kind && row.start < end && row.end > start)) continue;
     forecast.push({
-      title: kind === "abyss-1" ? "「剧变节点」" : "「危局强袭」", kind, start, end,
+      title: kind === "abyss-1" ? $t("calendar-data.text_2ed60bb2f3") : $t("calendar-data.text_f6c14d1dc1"), kind, start, end,
     });
   }
   return forecast;
@@ -304,7 +307,7 @@ function snapshot(list: unknown, detail: unknown, updated: number, game: Calenda
   const gs = game === "genshin";
   const zz = game === "zzz";
   const source = publicData(list, gs ? ["list"] : ["list", "pic_list"]);
-  if (source.timezone !== undefined && source.timezone !== 8) throw new Error("游戏公告时区变化。");
+  if (source.timezone !== undefined && source.timezone !== 8) throw new Error($t("calendar-data.text_2519d7ed6c"));
   const sections = records(source.list);
   const gsSections = sections.filter(({ type_label }) => type_label === "游戏公告" || type_label === "活动公告");
   const notices = gs ? (gsSections.length ? gsSections : sections.slice(0, 2))
@@ -317,7 +320,7 @@ function snapshot(list: unknown, detail: unknown, updated: number, game: Calenda
       .map((item) => ({ item, activity: true, picture: true })),
   ];
   if (!notices.some(({ item }) => typeof item.ann_id === "number" && typeof item.start_time === "string")) {
-    throw new Error("游戏公告列表没有可识别的活动。");
+    throw new Error($t("calendar-data.text_623183459c"));
   }
   let details: Record<string, unknown>[] = [];
   let detailsAvailable = false;
@@ -349,7 +352,7 @@ function snapshot(list: unknown, detail: unknown, updated: number, game: Calenda
     if (start === undefined || end === undefined || end <= start) continue;
     const character = gs && kind === "character" ? /·([^·(（」]+)[(（]/u.exec(title)?.[1] : undefined;
     if (gs && kind === "weapon") title = title.replace(/(?:单手剑|双手剑|长柄武器|弓|法器)·/gu, "");
-    if (zz) title = /预下载/u.test(title) ? "新版本预下载开启" :
+    if (zz) title = /预下载/u.test(title) ? $t("calendar-data.text_1cc5dca3e4") :
       title.replace(/(调频|活动|上新)(?:说明|公告)/gu, "$1").replace(/[」](?:说明|公告)/gu, "」");
     const wish = gs && (kind === "character" || kind === "weapon" || kind === "chronicled") && /^「[^」]+」祈愿[：:]/u.test(title);
     rows.set(key, {
@@ -404,7 +407,7 @@ export function buildZzzCalendar(list: unknown, content: unknown, now: number): 
 export async function readCalendarBytes(response: Response, limit: number) {
   if (!response.ok || !response.body || Number(response.headers.get("content-length")) > limit) {
     await response.body?.cancel().catch(() => {});
-    throw new Error("无法访问游戏官方公告。");
+    throw new Error($t("calendar-data.text_6230719c4b"));
   }
   const reader = response.body.getReader();
   let size = 0;
@@ -414,7 +417,7 @@ export async function readCalendarBytes(response: Response, limit: number) {
       const chunk = await reader.read();
       if (chunk.done) return Buffer.concat(chunks, size);
       size += chunk.value.length;
-      if (size > limit) throw new Error("游戏公告响应超限。");
+      if (size > limit) throw new Error($t("calendar-data.text_d3b1db67e8"));
       chunks.push(chunk.value);
     }
   } finally {

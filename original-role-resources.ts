@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import { createInitializationProgress } from "../../lib/initialization-progress.ts";
 import { reportResourceProgress, type ResourceProgressCallback } from "../../lib/resource-progress.ts";
 import { createHash } from "node:crypto";
@@ -42,14 +45,14 @@ function sourceResources(output: Uint8Array, scope: Scope) {
     const notes = base.endsWith("/RefStat") && file === "RefNotes.yaml";
     if (!notes && !/\.(?:png|jpe?g|webp)$/iu.test(file)) continue;
     const hash = /^100644 blob ([0-9a-f]{40})$/u.exec(metadata ?? "")?.[1];
-    if (!hash) throw new Error("角色原资源文件格式无效。");
+    if (!hash) throw new Error($t("original-role-resources.text_4c7cd8de48"));
     if (rawPath !== path || !selected.has(path)) selected.set(path, { path, hash, notes });
   }
   const resources = [...selected.values()].sort((left, right) => left.path.localeCompare(right.path));
   const requiredAbyssFileMissing = scope === "abyss" && !requiredAbyssReferences.every(path => resources.some(item => item.path === path));
   if (!resources.some(({ notes }) => !notes) || resources.length > 4000 || requiredAbyssFileMissing ||
       scope === "banners" && resources.length !== bannerFiles.length) {
-    throw new Error("攻略原资源清单不完整。");
+    throw new Error($t("original-role-resources.text_c896e8908c"));
   }
   return resources;
 }
@@ -114,18 +117,18 @@ export function createOriginalRoleResources({ root, cache, fallbacks, signal, so
   async function download(): Promise<"updated" | "current"> {
     const attempt = AbortSignal.any([signal, AbortSignal.timeout(scope === "roles" ? 60 * 60 * 1000 : 10 * 60_000)]);
     attempt.throwIfAborted();
-    const labels = { roles: "角色攻略", banners: "复刻表", abyss: "深渊参考" };
+    const labels = { roles: $t("original-role-resources.text_0a2b0a7356"), banners: $t("original-role-resources.text_6a2cf17295"), abyss: $t("original-role-resources.text_e2c92c5671") };
     const terminal = logProgress && !configuredProgress ? createInitializationProgress(labels[scope], { signal: attempt }) : undefined;
     const onProgress = configuredProgress ?? terminal?.update;
     let succeeded = false;
     const report = (phase: string, message: string, completed?: number, total?: number) =>
       reportResourceProgress(onProgress, attempt, `guides-${scope}-${phase}`, `${labels[scope]}：${message}`, completed, total);
-    report("prepare", "准备资源");
+    report("prepare", $t("original-role-resources.text_32890d638f"));
     let lock: Awaited<ReturnType<typeof lockFile>> | undefined;
     let temporary: string | undefined;
     try {
       await mkdir(root, { recursive: true, mode: 0o700 });
-      lock = await lockFile(join(root, "refresh.lock"), "角色原资源");
+      lock = await lockFile(join(root, "refresh.lock"), $t("original-role-resources.text_4ddf8fc21c"));
       attempt.throwIfAborted();
       await cleanGuideStages(root, ".install-");
       await writeGuideFile(pending, "");
@@ -144,14 +147,14 @@ export function createOriginalRoleResources({ root, cache, fallbacks, signal, so
         return "current";
       }
 
-      report("cache", "扫描本地缓存");
+      report("cache", $t("original-role-resources.text_847e9347b9"));
       const local = scope === "roles" ? await existingObjects(cache) : undefined;
       const stage = join(temporary, "stage");
       await mkdir(objects, { recursive: true });
       const unique = [...new Map(resources.map(item => [item.hash, item])).values()];
       for (let start = 0; start < unique.length; start += batchSize) {
         attempt.throwIfAborted();
-        report("download", "核对并补全文件", start, unique.length);
+        report("download", $t("original-role-resources.text_1d0e07c58a"), start, unique.length);
         const missing: Resource[] = [];
         for (const item of unique.slice(start, start + batchSize)) {
           let bytes = await readLocalGuideBlob(objects, item.hash, item.hash, limit(item));
@@ -166,16 +169,16 @@ export function createOriginalRoleResources({ root, cache, fallbacks, signal, so
           if (bytes && valid(item, bytes)) await writeGuideFile(join(objects, item.hash), bytes);
           else missing.push(item);
         }
-        report("fetch", `下载本批缺失文件（${missing.length} 项）`, start, unique.length);
+        report("fetch", $t("original-role-resources.text_758e0dd70a", { "length": missing.length }), start, unique.length);
         await fetchGuideBlobs(git, missing.map(({ hash }) => hash));
         for (const item of missing) {
           attempt.throwIfAborted();
           const bytes = await git(["cat-file", "blob", item.hash], undefined, limit(item));
-          if (guideBlobId(bytes) !== item.hash || !valid(item, bytes)) throw new Error("角色原图不完整。");
+          if (guideBlobId(bytes) !== item.hash || !valid(item, bytes)) throw new Error($t("original-role-resources.text_6a55cbc95d"));
           await writeGuideFile(join(objects, item.hash), bytes);
-          report("fetch", `已取得 ${item.path}`);
+          report("fetch", $t("original-role-resources.text_10b737a56b", { "path": item.path }));
         }
-        report("download", "文件已校验并准备", Math.min(start + batchSize, unique.length), unique.length);
+        report("download", $t("original-role-resources.text_29fb3d2962"), Math.min(start + batchSize, unique.length), unique.length);
       }
 
       let publishedCount = 0;
@@ -184,7 +187,7 @@ export function createOriginalRoleResources({ root, cache, fallbacks, signal, so
         const file = join(stage, item.path);
         await mkdir(dirname(file), { recursive: true });
         await link(join(objects, item.hash), file);
-        report("install", "保存资源", ++publishedCount, resources.length);
+        report("install", $t("original-role-resources.text_a9101e1619"), ++publishedCount, resources.length);
       }
       const next = `snapshots/${tree}-${crypto.randomUUID()}`;
       const pointer = join(temporary, "pointer");
@@ -203,7 +206,7 @@ export function createOriginalRoleResources({ root, cache, fallbacks, signal, so
       try { if (temporary) await rm(temporary, { recursive: true, force: true }); }
       finally {
         if (succeeded) terminal?.complete();
-        else terminal?.fail(attempt.aborted ? "资源准备已中止" : "资源准备失败");
+        else terminal?.fail(attempt.aborted ? $t("original-role-resources.text_3499bdb4ca") : $t("original-role-resources.text_33382d5eff"));
         lock?.close();
       }
     }

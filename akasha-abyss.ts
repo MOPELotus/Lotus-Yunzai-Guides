@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import { builtinResourceDirectory } from "../../lib/builtin-resources.ts";
 import { transientReadResponse, withReadRetries } from "@lotus-yunzai/http";
 import type { MessageSegment } from "../../lib/messages.ts";
@@ -11,12 +14,12 @@ const refreshInterval = 10 * 60_000;
 const teamPageSize = 14;
 const helpImage = "img/AkashaHelp.png";
 const helpText = [
-  "虚空深渊帮助",
-  "#虚空深渊使用率 · 全部角色",
-  "#虚空五星使用率 / #虚空四星使用率",
+  $t("akasha-abyss.text_1f3846e427"),
+  $t("akasha-abyss.text_7f44f9d2f0"),
+  $t("akasha-abyss.text_dd1c9de2f2"),
   "#虚空深渊上半队伍出战数1",
   "#虚空深渊下半队伍满星率2",
-  "队伍可查看上半、下半或全部，页码 1–7。榜单以来源更新日期为准。",
+  $t("akasha-abyss.text_b758e9f2f6"),
 ].join("\n");
 
 type Row = Record<string, unknown>;
@@ -30,24 +33,24 @@ type Query =
   | { readonly type: "teams"; readonly half: Half; readonly sort: "出战数" | "满星率"; readonly page: number };
 
 function record(value: unknown): Row {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("虚空榜单的字段格式有误。");
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError($t("akasha-abyss.text_5ef4c1efb6"));
   return value as Row;
 }
 
 function rows(input: unknown) {
-  if (!Array.isArray(input) || !input.length || input.length > 500) throw new TypeError("虚空榜单条数无效。");
+  if (!Array.isArray(input) || !input.length || input.length > 500) throw new TypeError($t("akasha-abyss.text_6814649ec6"));
   return input.map(record);
 }
 
 function string(value: unknown, pattern: RegExp) {
-  if (typeof value !== "string" || !pattern.test(value)) throw new TypeError("虚空榜单的文本无效。");
+  if (typeof value !== "string" || !pattern.test(value)) throw new TypeError($t("akasha-abyss.text_d995a45872"));
   return value;
 }
 
 function number(value: unknown, maximum: number, integer = false) {
   const parsed = typeof value === "string" && /^\d+(?:\.\d+)?$/u.test(value) ? Number(value) : value;
   if (typeof parsed !== "number" || !Number.isFinite(parsed) || parsed < 0 || parsed > maximum ||
-      (integer && !Number.isSafeInteger(parsed))) throw new TypeError("虚空榜单的数值无效。");
+      (integer && !Number.isSafeInteger(parsed))) throw new TypeError($t("akasha-abyss.text_e2679c710a"));
   return parsed;
 }
 
@@ -65,7 +68,7 @@ export function matchAkashaAbyss(message: string): Query | undefined {
 function parseAssignment(buffer: Buffer, variable: "static_abyss_total" | "static_card_dict") {
   const text = buffer.toString("utf8").trim();
   const assignment = new RegExp(`^(?:var|let|const)\\s+${variable}\\s*=\\s*(\\{[\\s\\S]*\\})\\s*;?$`, "u").exec(text);
-  if (!assignment) throw new TypeError("虚空榜单的原数据不完整。");
+  if (!assignment) throw new TypeError($t("akasha-abyss.text_bd02cc06f3"));
   return record(JSON.parse(assignment[1]!));
 }
 
@@ -74,11 +77,11 @@ function snapshot(total: Buffer, dictionary: Buffer) {
   const names = parseAssignment(dictionary, "static_card_dict");
   const date = string(data.modify_time, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?::\d{2})?$/u);
   const timestamp = Date.parse(date.replace(" ", "T") + "+08:00");
-  if (!Number.isFinite(timestamp)) throw new TypeError("虚空榜单的更新时间无效。");
+  if (!Number.isFinite(timestamp)) throw new TypeError($t("akasha-abyss.text_4b4bc73dc1"));
   const version = string(data.schedule_version_desc, /^[\p{L}\p{N} .（）()-]{1,30}$/u);
   const characters: readonly Character[] = rows(data.character_used_list).map(character => {
     const rarity = number(character.rarity, 5, true);
-    if (rarity !== 4 && rarity !== 5) throw new TypeError("虚空榜单的角色星级无效。");
+    if (rarity !== 4 && rarity !== 5) throw new TypeError($t("akasha-abyss.text_2454def990"));
     const name = string(character.name, characterName);
     const role = resolveGuideRole(name, "gs");
     return { name, portraitName: typeof role === "object" && role.name !== name ? role.name : undefined,
@@ -87,7 +90,7 @@ function snapshot(total: Buffer, dictionary: Buffer) {
   function teams(field: string, count: string, full: string): readonly Team[] {
     return rows(data[field]).map(team => {
       const lineup = team.tl;
-      if (!Array.isArray(lineup) || !lineup.length || lineup.length > 4) throw new TypeError("虚空榜单的队伍名单无效。");
+      if (!Array.isArray(lineup) || !lineup.length || lineup.length > 4) throw new TypeError($t("akasha-abyss.text_2ca2d1e82b"));
       return {
         names: lineup.map(id => string(record(names[String(number(id, 100_000, true))]).name, characterName)),
         count: number(team[count], 10_000_000, true),
@@ -124,7 +127,7 @@ async function fetchBytes(url: string, limit: number, request: Transport, signal
   }
   if (!reply.ok || !reply.body || Number(reply.headers.get("content-length")) > limit) {
     await reply.body?.cancel();
-    throw new Error("虚空榜单来源不可用。");
+    throw new Error($t("akasha-abyss.text_d5eca5d077"));
   }
   const chunks: Uint8Array[] = [];
   const reader = reply.body.getReader();
@@ -134,7 +137,7 @@ async function fetchBytes(url: string, limit: number, request: Transport, signal
       const { value, done } = await reader.read();
       if (done) break;
       count += value.byteLength;
-      if (count > limit) throw new Error("虚空榜单内容超出限制。");
+      if (count > limit) throw new Error($t("akasha-abyss.text_d7ae308bdb"));
       chunks.push(value);
     }
     return Buffer.concat(chunks, count);
@@ -187,27 +190,27 @@ export function createAkashaAbyss({ signal, themes = [], transport = fetch, cloc
     }
     const source = await body();
     if (signal.aborted) return;
-    if (!source) return "虚空深渊数据暂时不可用。";
-    const lead = `${source.version} · 深渊12层`;
-    const meta = `数据来源 akashadata.com · 更新时间 ${source.date}`;
-    const history = clock() - source.timestamp > sourceAge ? "历史快照" : undefined;
+    if (!source) return $t("akasha-abyss.text_3835dbd27d");
+    const lead = $t("akasha-abyss.text_b8adf97467", { "version": source.version });
+    const meta = $t("akasha-abyss.text_57d32b4df7", { "date": source.date });
+    const history = clock() - source.timestamp > sourceAge ? $t("akasha-abyss.text_fc9f1fdaa0") : undefined;
     let card: AkashaCard;
     if (query.type === "usage") {
       const characters = source.characters.filter(row => query.rarity === undefined || row.rarity === query.rarity);
-      if (!characters.length) return `${lead} · 暂无该星级使用率。`;
-      card = { type: "usage", lead, meta, history, label: query.rarity ? `${query.rarity} 星角色使用率` : "角色使用率", characters };
+      if (!characters.length) return $t("akasha-abyss.text_7ada4813e5", { "lead": lead });
+      card = { type: "usage", lead, meta, history, label: query.rarity ? $t("akasha-abyss.text_8a56c6ab9d", { "rarity": query.rarity }) : $t("akasha-abyss.text_9a0c4b9c07"), characters };
     } else {
       const sorted = query.sort === "满星率" ? [...source.teams[query.half]].sort((a, b) => b.full - a.full) : source.teams[query.half];
       const offset = (query.page - 1) * teamPageSize;
       const teams = sorted.slice(offset, offset + teamPageSize);
-      if (!teams.length) return `${lead} · 第 ${query.page} 页暂无队伍。`;
-      card = { type: "teams", lead, meta, history, label: `${query.half}队伍 · ${query.sort}`,
+      if (!teams.length) return $t("akasha-abyss.text_ac623ce2f3", { "lead": lead, "page": query.page });
+      card = { type: "teams", lead, meta, history, label: $t("akasha-abyss.text_838ac0ba92", { "half": query.half, "sort": query.sort }),
         page: query.page, pageCount: Math.min(7, Math.ceil(sorted.length / teamPageSize)), teams };
     }
     const plain = (card.type === "usage"
       ? card.characters.map(row => `${row.name} ${row.rate.toFixed(1)}%`)
-      : card.teams.map(row => `${row.names.join("、")} · ${row.count} 次 · ${row.full.toFixed(2)}% · ${row.ratio}`)).join("\n");
-    const page = card.type === "teams" ? `第 ${card.page}/${card.pageCount} 页` : undefined;
+      : card.teams.map(row => $t("akasha-abyss.text_85032a4f47", { "value1": row.names.join("、"), "count": row.count, "value3": row.full.toFixed(2), "ratio": row.ratio }))).join("\n");
+    const page = card.type === "teams" ? $t("akasha-abyss.text_54595f6d35", { "page": card.page, "pageCount": card.pageCount }) : undefined;
     const text = [lead, card.label, history, meta, page, plain].filter(Boolean).join("\n");
     const png = await draw(card, asset).catch(() => undefined);
     if (signal.aborted) return;

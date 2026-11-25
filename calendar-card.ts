@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import { prepareBuiltinFonts, builtinFontFallback } from "../../packages/skia/builtin-fonts.ts";
 import { withReadRetries } from "@lotus-yunzai/http";
 // Layout and colors adapted from Miao-Plugin resources/wiki/calendar.html and calendar.css (MIT).
@@ -11,7 +14,7 @@ import { genshinCalendarExtras, genshinCalendarMaterial, genshinCalendarPortrait
 
 const day = 86_400_000;
 const china = 8 * 3_600_000;
-const weekdays = "日一二三四五六";
+const weekdays = $t("calendar-card.text_006148fb62");
 const fontName = "LotusCalendarText";
 const numberFont = "LotusCalendarNumbers";
 const loadedFonts = new Set<string>();
@@ -29,22 +32,22 @@ function time(value: number, year = false) {
 }
 
 function relative(milliseconds: number) {
-  if (milliseconds >= day) return `${Math.round(milliseconds / day)}天`;
-  if (milliseconds >= 3_600_000) return `${Math.floor(milliseconds / 3_600_000)}小时`;
-  return `${Math.max(1, Math.floor(milliseconds / 60_000))}分钟`;
+  if (milliseconds >= day) return $t("calendar-card.text_b4baa30d48", { "value1": Math.round(milliseconds / day) });
+  if (milliseconds >= 3_600_000) return $t("calendar-card.text_f512482fac", { "value1": Math.floor(milliseconds / 3_600_000) });
+  return $t("calendar-card.text_1bd5b8aea7", { "value1": Math.max(1, Math.floor(milliseconds / 60_000)) });
 }
 
 function label(row: CalendarRow, now: number, showStart: boolean) {
-  if (row.permanent) return row.start <= now ? `${time(row.start)} 后永久有效` : "永久开放";
-  if (row.startUnverified) return `截止：${time(row.end)}`;
-  if (row.end - row.start > 365 * day) return "结束时间以活动公告为准";
-  if (row.earliestEnd !== undefined) return `分批结束：${time(row.earliestEnd)} 至 ${time(row.end)}`;
+  if (row.permanent) return row.start <= now ? $t("calendar-card.text_76fed77dc3", { "value1": time(row.start) }) : $t("calendar-card.text_f9e9306828");
+  if (row.startUnverified) return $t("calendar-card.text_d38262246e", { "value1": time(row.end) });
+  if (row.end - row.start > 365 * day) return $t("calendar-card.text_52a7fefd62");
+  if (row.earliestEnd !== undefined) return $t("calendar-card.text_32f584bc7c", { "value1": time(row.earliestEnd), "value2": time(row.end) });
   const crossesYear = new Date(row.start + china).getUTCFullYear() !== new Date(row.end + china).getUTCFullYear();
   const start = time(row.start, crossesYear);
   const end = time(row.end, crossesYear);
-  if (row.monthlyRotation) return `按月轮换 · ${showStart ? start + " ~ " : ""}${end}`;
-  if (row.start > now) return `${start}（${relative(row.start - now)}后开始）`;
-  if (row.end > now) return `${showStart ? start + " ~ " : ""}${end}（${relative(row.end - now)}后结束）`;
+  if (row.monthlyRotation) return $t("calendar-card.text_26f9f67809", { "value1": showStart ? start + " ~ " : "", "end": end });
+  if (row.start > now) return $t("calendar-card.text_16b0a042a3", { "start": start, "value2": relative(row.start - now) });
+  if (row.end > now) return $t("calendar-card.text_92a75f517c", { "value1": showStart ? start + " ~ " : "", "end": end, "value3": relative(row.end - now) });
   return `${start} ~ ${end}`;
 }
 
@@ -221,10 +224,10 @@ export async function renderCalendar(data: CalendarData, mode: "calendar" | "lis
         if (i === 0 || cell.getUTCDate() === 1) {
           const last = new Date(Date.UTC(cell.getUTCFullYear(), cell.getUTCMonth() + 1, 0)).getUTCDate();
           const span = Math.min(13 - i, last - cell.getUTCDate() + 1);
-          text(c, `${cell.getUTCMonth() + 1}月`, x + column * span / 2, 57, 18, "#d3bc8d", family, "center");
+          text(c, $t("calendar-card.text_fa4962f757", { "value1": cell.getUTCMonth() + 1 }), x + column * span / 2, 57, 18, "#d3bc8d", family, "center");
         }
-        text(c, `${cell.getUTCDate()}日`, x + column / 2, 89, 16, i === current ? "#141414" : "#fff", family, "center");
-        text(c, `周${weekdays[cell.getUTCDay()]}`, x + column / 2, 104, 11, i === current ? "#141414" : "#aaa", family, "center");
+        text(c, $t("calendar-card.text_e6ad509939", { "value1": cell.getUTCDate() }), x + column / 2, 89, 16, i === current ? "#141414" : "#fff", family, "center");
+        text(c, $t("calendar-card.text_4f0d66e2e2", { "value1": weekdays[cell.getUTCDay()] }), x + column / 2, 104, 11, i === current ? "#141414" : "#aaa", family, "center");
         c.fillStyle = "#ffffff44";
         c.fillRect(x, 70, 1, panelHeight - 40);
         for (const [index, role] of (births[i] ?? []).entries()) {
@@ -235,18 +238,18 @@ export async function renderCalendar(data: CalendarData, mode: "calendar" | "lis
           if (image) cover(c, image, x + 7, y, column - 14, 49);
           c.fillStyle = "#e8e2d8";
           c.fillRect(x + 7, y + 49, column - 14, 15);
-          text(c, role.short.length >= 4 ? role.short : role.short + "生日", x + column / 2, y + 61, 10, "#25272b", family, "center", column - 18);
+          text(c, role.short.length >= 4 ? role.short : role.short + $t("calendar-card.text_8f5ecd9fc2"), x + column / 2, y + 61, 10, "#25272b", family, "center", column - 18);
         }
       }
     } else {
-      text(c, "活动列表", width / 2, 57, 19, "#d3bc8d", family, "center");
+      text(c, $t("calendar-card.text_127799c804"), width / 2, 57, 19, "#d3bc8d", family, "center");
     }
     const nowX = 20 + (data.now - data.start) / (13 * day) * panel;
     if (timeline) {
       c.fillStyle = "#ffffffe0";
       c.fillRect(nowX, 110, 2, panelHeight - 64);
     }
-    if (!rows.length) text(c, "这段时间暂无公开活动", width / 2, 255, 21, "#eee", family, "center");
+    if (!rows.length) text(c, $t("calendar-card.text_34fa33dbb3"), width / 2, 255, 21, "#eee", family, "center");
     for (const [i, line] of rows.entries()) for (const row of line) {
       const start = timeline ? Math.max(0, (row.start - data.start) / (13 * day)) : 0;
       const end = timeline ? Math.min(1, (row.end - data.start) / (13 * day)) : 1;
@@ -270,7 +273,7 @@ export async function renderCalendar(data: CalendarData, mode: "calendar" | "lis
       const padding = badge && w >= 115 ? small ? 37 : narrow ? 40 : 54 : 8;
       const heading = narrow ? row.character ?? /^「([^」]+)」/u.exec(row.title)?.[1] ?? row.title : row.title;
       const summary = narrow && !row.startUnverified && data.now < row.start
-        ? `${row.monthlyRotation ? "按月轮换 · " : ""}${time(row.start)}` : label(row, data.now, w > 365);
+        ? `${row.monthlyRotation ? $t("calendar-card.text_69d527473f") : ""}${time(row.start)}` : label(row, data.now, w > 365);
       const textWidth = Math.max(0, (banner && !narrow ? w * 0.76 : w) - padding - 8);
       if (banner && w >= 60) {
         const bw = Math.min(Math.round(w * 0.6), 500);
@@ -303,9 +306,9 @@ export async function renderCalendar(data: CalendarData, mode: "calendar" | "lis
       }
       c.restore();
     }
-    let foot = `当前时间：${time(data.now, true)}`;
-    if (data.stale) foot += ` · 上次公告：${time(data.updated, true)}`;
-    if (!data.detailsAvailable) foot += " · 公告详情暂不可用";
+    let foot = $t("calendar-card.text_d63c6143d3", { "value1": time(data.now, true) });
+    if (data.stale) foot += $t("calendar-card.text_ffe1c0506d", { "value1": time(data.updated, true) });
+    if (!data.detailsAvailable) foot += $t("calendar-card.text_4ad11bf3eb");
     c.fillStyle = "#0009";
     c.beginPath();
     c.roundRect(width / 2 - 280, footer - 48, 560, 34, 18);
@@ -350,5 +353,5 @@ export async function renderCalendar(data: CalendarData, mode: "calendar" | "lis
     const half = await render(2);
     if (half.png.byteLength <= limit) return half;
   }
-  throw new ImageSizeLimitError("当前会话的图片大小上限不足以发送完整日历。");
+  throw new ImageSizeLimitError($t("calendar-card.text_bb56bda25e"));
 }

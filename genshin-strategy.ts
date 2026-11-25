@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import { mkdir } from "node:fs/promises";
 import { dirname, basename, join } from "node:path";
 import { lockFile } from "../../lib/file-lock.ts";
@@ -6,13 +9,13 @@ import { readGuideFile, writeGuideFile } from "./role-image-files.ts";
 
 // TRSS Genshin strategy.js at 0290a17 defines these permanent source numbers.
 const sources = [
-  { source: "西风驿站", collection_id: [2319292, 2319293, 2319295, 2319296, 2319299, 2319294, 2319298, 642956] },
-  { source: "原神观测枢", collection_id: [813033] },
-  { source: "派蒙喵喵屋", collection_id: [341284] },
-  { source: "OH是姜姜呀", collection_id: [341523] },
-  { source: "曉K", collection_id: [1582613] },
-  { source: "坤易", collection_id: [22148] },
-  { source: "婧枫赛赛", collection_id: [1812949] },
+  { source: $t("genshin-strategy.text_3f1ba7ca9c"), collection_id: [2319292, 2319293, 2319295, 2319296, 2319299, 2319294, 2319298, 642956] },
+  { source: $t("genshin-strategy.text_c1c0189bc9"), collection_id: [813033] },
+  { source: $t("genshin-strategy.text_9496d42dc8"), collection_id: [341284] },
+  { source: $t("genshin-strategy.text_a6eaba6ac9"), collection_id: [341523] },
+  { source: $t("genshin-strategy.text_b4c6adf776"), collection_id: [1582613] },
+  { source: $t("genshin-strategy.text_fe561c5a71"), collection_id: [22148] },
+  { source: $t("genshin-strategy.text_26fbb37d49"), collection_id: [1812949] },
 ] as const;
 
 export function genshinStrategySource(number: number) {
@@ -26,9 +29,9 @@ export function genshinStrategyNumber(author: { readonly source: string; readonl
 }
 
 export const genshinStrategyHelp = [
-  "原神编号攻略",
-  "发送 #心海攻略4 指定来源，或用 #更新早柚攻略4 刷新该来源。",
-  "机器人主人可用 #设置默认攻略1 设置仅在普通攻略没有图时使用的来源。",
+  $t("genshin-strategy.text_d6e1ae7557"),
+  $t("genshin-strategy.text_4fc06b71e5"),
+  $t("genshin-strategy.text_4595e76ae5"),
   ...sources.map(({ source }, index) => `${index + 1}. ${source}`),
 ].join("\n");
 
@@ -56,7 +59,7 @@ export function createGenshinStrategyPreference(file: string, legacy?: string) {
       if (canWrite && !canWrite()) throw new GuideSettingsError("permission");
       const directory = dirname(file);
       await mkdir(directory, { recursive: true, mode: 0o700 });
-      const lock = await lockFile(join(directory, ".genshin-strategy.sqlite"), "原神攻略设置");
+      const lock = await lockFile(join(directory, ".genshin-strategy.sqlite"), $t("genshin-strategy.text_e16b588498"));
       try {
         const latest = await get();
         if (previous !== undefined && latest !== previous) throw new GuideSettingsError("conflict");

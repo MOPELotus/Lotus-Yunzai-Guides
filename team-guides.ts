@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 // Adapted from Mora-Plugin model/team.js and model/commonTools.js.
 // Original author Rrrrrrray. GPLv3, see LICENSE.
 import { constants } from "node:fs";
@@ -26,14 +29,14 @@ for (const [name, aliases] of Object.entries(alias)) {
 
 function dictionary(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error("无效的配队索引。");
+    throw new Error($t("team-guides.text_06d1ffa3d8"));
   }
   return value as Record<string, unknown>;
 }
 
 function names(value: unknown): readonly string[] {
   if (!Array.isArray(value) || value.some((name) => typeof name !== "string")) {
-    throw new Error("无效的配队索引。");
+    throw new Error($t("team-guides.text_06d1ffa3d8"));
   }
   return value;
 }
@@ -67,7 +70,7 @@ function searchTeams(teams: TeamIndex, query: string) {
   const element = travelerElements.includes(roleAlias);
   const role = element ? roleAlias : roleNames.get(roleAlias.toLowerCase()) ?? roleAlias;
   if (travelerNames.includes(role) || /^(?:[风岩雷草水火冰])(?:旅行者|主角|空|荧|爷)$/u.test(role)) {
-    return { traveler: `请选择${query}配队：${travelerElements.map((name) => `${name}配队`).join("、")}` };
+    return { traveler: $t("team-guides.text_55c213041f", { "query": query, "value2": travelerElements.map((name) => $t("team-guides.text_380ec1b133", { "name": name })).join("、") }) };
   }
 
   const findByRole = tea.filter(([, team]) => team.role.includes(role));
@@ -85,12 +88,12 @@ export async function readResourceSnapshot(root: string, file: string, limit: nu
   const path = await realpath(file);
   const rel = relative(root, path);
   if (!rel || isAbsolute(rel) || rel === ".." || rel.startsWith(`..${sep}`)) {
-    throw new Error("配队资源路径已超出目录。");
+    throw new Error($t("team-guides.text_af431e2651"));
   }
   const handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW);
   try {
     const info = await handle.stat();
-    if (!info.isFile() || info.size === 0 || info.size > limit) throw new Error("无效的配队资源文件。");
+    if (!info.isFile() || info.size === 0 || info.size > limit) throw new Error($t("team-guides.text_f43c76d869"));
     const buffer = Buffer.alloc(info.size + 1);
     let offset = 0;
     while (offset < buffer.length) {
@@ -98,7 +101,7 @@ export async function readResourceSnapshot(root: string, file: string, limit: nu
       if (bytesRead === 0) break;
       offset += bytesRead;
     }
-    if (offset !== info.size) throw new Error("读取期间配队资源发生变化。");
+    if (offset !== info.size) throw new Error($t("team-guides.text_9e0281de7e"));
     return { bytes: buffer.subarray(0, offset), modifiedAt: info.mtimeMs };
   } finally {
     await handle.close();
@@ -116,12 +119,12 @@ export async function teamGuides(directory: string, query: string, forward: bool
     root = await realpath(directory);
     teams = teamIndex((await readResource(root, join(root, "teamGuides.yaml"), 1024 * 1024)).toString("utf8"));
   } catch {
-    return "原神配队资源不可用。请检查配队资源目录和 teamGuides.yaml。";
+    return $t("team-guides.text_98ff4363f1");
   }
 
   const match = searchTeams(teams, query);
   if (match.traveler) return match.traveler;
-  if (!match.images?.length) return `暂无${query}配队捏`;
+  if (!match.images?.length) return $t("team-guides.text_b992115dc4", { "query": query });
 
   const images = [];
   for (const [author, name] of match.images) {
@@ -134,9 +137,9 @@ export async function teamGuides(directory: string, query: string, forward: bool
     }
   }
   const [single, ...rest] = images;
-  if (!single) return "没找到对应的配队图片，请检查原资源包是否完整。";
+  if (!single) return $t("team-guides.text_960c0db897");
   if (!rest.length) return single;
-  const title = `${query}配队详情`;
+  const title = $t("team-guides.text_2511a2f3b2", { "query": query });
   return forward ? { type: "forward", nodes: [title, ...images] } : [title, ...images];
 }
 

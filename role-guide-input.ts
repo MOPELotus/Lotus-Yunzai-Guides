@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 // The old role command and traveler names are from Mora-Plugin.
 import { alias as genshinAliases } from "./genshin-guide-aliases.ts";
 import genshinNames from "./genshin-guide-names.json";
@@ -5,9 +8,9 @@ import { alias as starrailAliases } from "./starrail-guide-aliases.ts";
 import starrailNames from "./starrail-guide-names.json";
 
 export const guideGames = {
-  gs: { label: "原神", pack: "Genshin", config: "roleGuides.yaml" },
-  sr: { label: "星铁", pack: "StarRail", config: "srRoleGuides.yaml" },
-  zzz: { label: "绝区零", pack: "ZenlessZoneZero", config: "zzzRoleGuides.yaml" },
+  gs: { label: $t("role-guide-input.text_d1597c51ed"), pack: "Genshin", config: "roleGuides.yaml" },
+  sr: { label: $t("role-guide-input.text_a2927891f0"), pack: "StarRail", config: "srRoleGuides.yaml" },
+  zzz: { label: $t("role-guide-input.text_b1110352c9"), pack: "ZenlessZoneZero", config: "zzzRoleGuides.yaml" },
 } as const;
 export type GuideGame = keyof typeof guideGames;
 
@@ -71,13 +74,13 @@ export function resolveGuideRole(query: string, game: GuideGame): GuideRole | st
     if (travelers.includes(input)) return { name: input };
     const role = gs.get(guideKey(input));
     if (role && ["10000005", "10000007", "20000000"].includes(role.id)) {
-      return `请选择${input}攻略：${travelers.map((name) => `${name}攻略`).join("、")}`;
+      return $t("role-guide-input.text_cc21baabe2", { "input": input, "value2": travelers.map((name) => $t("role-guide-input.text_67139deb3a", { "name": name })).join("、") });
     }
     return role;
   }
   if (game === "sr") {
     if (/^(?:主|主角|爷|开拓者|星|穹)$/u.test(input)) {
-      return `请选择${input}攻略：${trailblazers.map(([name]) => `${name}主攻略`).join("、")}`;
+      return $t("role-guide-input.text_cc21baabe2", { "input": input, "value2": trailblazers.map(([name]) => $t("role-guide-input.text_2c91d48dd0", { "name": name })).join("、") });
     }
     const role = sr.get(guideKey(input));
     for (const [element, id, aliases] of trailblazers) {

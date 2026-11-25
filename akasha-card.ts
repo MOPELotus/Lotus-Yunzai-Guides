@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import { brandTextColor } from "@lotus-yunzai/skia/brand-color";
 import { renderPng } from "@lotus-yunzai/skia";
 import { loadImage, type CanvasRenderingContext2D as Context, type Image } from "skia-canvas";
@@ -64,7 +67,7 @@ export async function drawAkashaCard(card: AkashaCard, readImage: ReadImage, mod
     context.fillStyle = "#10162544";
     context.fillRect(0, 0, width, height);
 
-    label(context, "Lotus-Yunzai · @容容容三岁 设计", width - 56, 86, 31, { align: "right", color: "#fff" });
+    label(context, $t("akasha-card.text_47985f9dc2"), width - 56, 86, 31, { align: "right", color: "#fff" });
     label(context, card.meta, width - 56, 135, 32, { align: "right" });
     if (card.history) label(context, card.history, width - 56, 181, 36, { align: "right", color: "#ffda96" });
 
@@ -80,7 +83,7 @@ export async function drawAkashaCard(card: AkashaCard, readImage: ReadImage, mod
       for (const [index, group] of groups.entries()) {
         const separator = separators[index];
         if (separator) context.drawImage(separator, 65, y, Math.min(separator.width, 1560), 35);
-        label(context, index === 3 ? "低于 6%" : `${limits[index]}%+`, 315, y + 34, 32, { color: "#ffdfac" });
+        label(context, index === 3 ? $t("akasha-card.text_cfa182f250") : `${limits[index]}%+`, 315, y + 34, 32, { color: "#ffdfac" });
         y += 52 * compression;
         for (const [position, character] of group.entries()) {
           const x = 70 + (position % columns[index]!) * 123;
@@ -111,13 +114,13 @@ export async function drawAkashaCard(card: AkashaCard, readImage: ReadImage, mod
         if (portrait) cover(context, portrait, x, top + 35, 129, 112);
         label(context, name, x + 64, top + 177, 27, { align: "center", maxWidth: 127 });
       }
-      const metrics = [["出战数", String(team.count)], ["满星率", team.full.toFixed(2) + "%"], ["上下比", team.ratio]];
+      const metrics = [[$t("akasha-card.text_aeb9cf29e9"), String(team.count)], [$t("akasha-card.text_ea438695f0"), team.full.toFixed(2) + "%"], [$t("akasha-card.text_7bab9605c6"), team.ratio]];
       for (const [index, [name, value]] of metrics.entries()) {
         const x = left + 150 + index * 204;
         label(context, value!, x, top + 219, 38, { align: "center" });
         label(context, name!, x, top + 251, 26, { align: "center", color: "#f6e5cc" });
       }
     }
-    label(context, `第 ${card.page}/${card.pageCount} 页 · 虚空深渊队伍 1–7`, width / 2, height - 65, 43, { align: "center" });
+    label(context, $t("akasha-card.text_472afe95aa", { "page": card.page, "pageCount": card.pageCount }), width / 2, height - 65, 43, { align: "center" });
   }, mode, { allowHalfScale: true });
 }

@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 // Source precedence and legacy cache layout are from Mora-Plugin model/roleGuide.js.
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -74,8 +77,8 @@ export function createRoleGuides(options: {
 
   function numberedLookup(role: GuideRole, source: number, update: boolean): Promise<CommandReply> {
     const author = genshinStrategySource(source);
-    if (!author) return Promise.resolve("原神攻略来源编号无效。请发送 #攻略帮助 查看来源。");
-    const error = `暂无${role.name}攻略（${author.source}）。可发送 #攻略帮助 查看其他来源。`;
+    if (!author) return Promise.resolve($t("role-guides.text_ef000bdafe"));
+    const error = $t("role-guides.text_58b8b6d917", { "name": role.name, "source": author.source });
     return operation(`gs/${role.name}/numbered/${source}`, update, async () => {
       const filename = role.name + ".jpg";
       const local = join("numbered", String(source), filename);
@@ -91,10 +94,10 @@ export function createRoleGuides(options: {
       const directory = join(options.atlas, "star-rail-atlas", "guide for role");
       const byId = id && safeGuideName(id) ? await readGuideImage(directory, id + ".png") : undefined;
       const bytes = byId ?? await readGuideImage(directory, name + ".png");
-      if (bytes) return { source: "听语惊花", bytes };
+      if (bytes) return { source: $t("role-guides.text_924f484f0d"), bytes };
     } else {
-      const bytes = await readGuideImage(join(options.atlas, "zzz-atlas", "角色攻略"), name + ".png");
-      if (bytes) return { source: "新艾利都快讯", bytes };
+      const bytes = await readGuideImage(join(options.atlas, "zzz-atlas", "角色"), name + ".png");
+      if (bytes) return { source: $t("role-guides.text_1acdcd6272"), bytes };
     }
   }
 
@@ -143,10 +146,10 @@ export function createRoleGuides(options: {
     if (!result.length) {
       if (useDefault && game === "gs") return numberedLookup(role, await preference.get(), update);
       if (useDefault && game === "zzz") return zzz.lookup(role.name, update);
-      return `暂无${role.name}的${gamePath.label}攻略。`;
+      return $t("role-guides.text_b783a829fe", { "name": role.name, "label": gamePath.label });
     }
     if (result.length === 1) return result[0]!;
-    const title = role.name + "攻略~";
+    const title = role.name + $t("role-guides.text_d2f920b643");
     return options.forward === false ? [title, ...result] : { type: "forward", nodes: [title, ...result] };
   }
 
@@ -159,11 +162,11 @@ export function createRoleGuides(options: {
     if (/^#?(?:原神)?攻略(?:帮助|说明)?$/u.test(input)) return genshinStrategyHelp;
     const setting = /^#?(?:原神)?设置默认攻略([1-7])?$/u.exec(input);
     if (setting) {
-      if (!isMaster) return "只有主人可以设置默认攻略。";
-      if (!setting[1]) return "请发送 #设置默认攻略1 至 #设置默认攻略7。";
+      if (!isMaster) return $t("role-guides.text_2e8f813ad5");
+      if (!setting[1]) return $t("role-guides.text_359a3bde90");
       const source = Number(setting[1]);
-      return preference.set(source).then(() => `已设置默认攻略来源 ${source}（${genshinStrategySource(source)!.source}）。`,
-        () => "保存默认攻略来源失败，请稍后再试。");
+      return preference.set(source).then(() => $t("role-guides.text_353dfeb909", { "source": source, "value2": genshinStrategySource(source)!.source }),
+        () => $t("role-guides.text_254303838f"));
     }
     const command = parseGuideCommand(input);
     if (!command) return;
@@ -179,7 +182,7 @@ export function createRoleGuides(options: {
       const fallbackPreference = game !== "sr" && withPreference;
       const standard = () => operation(`${game}/${role.name}/${fallbackPreference ? "strategy" : "guide"}`, update,
         () => lookup(game, role, update, fallbackPreference),
-        `暂时无法取得${role.name}的${guideGames[game].label}攻略。`);
+        $t("role-guides.text_8b7f0ff356", { "name": role.name, "label": guideGames[game].label }));
       return game === "sr" && withPreference ? starRail.defaultSource().then(preferred =>
         preferred === undefined ? standard() : starRail.lookup(role, preferred, update)) : standard();
     }

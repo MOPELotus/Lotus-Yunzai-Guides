@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 // Collection and post selection adapted from Mora-Plugin model/roleGuide.js.
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -17,14 +20,14 @@ function objects(value: unknown): Record<string, unknown>[] {
 }
 
 function authors(value: unknown): Author[] {
-  if (!Array.isArray(value) || value.length > 12) throw new Error("攻略作者格式无效。");
+  if (!Array.isArray(value) || value.length > 12) throw new Error($t("role-guide-collections.text_ddc1f23c7f"));
   return value.map((entry) => {
     const { source, collection_id } = object(entry);
     if (typeof source !== "string" || !safeGuideName(source) || !Array.isArray(collection_id) || collection_id.length > 12) {
-      throw new Error("攻略合集格式无效。");
+      throw new Error($t("role-guide-collections.text_31d2de45f5"));
     }
     const ids = collection_id.map((id) => typeof id === "string" && /^\d+$/u.test(id) ? Number(id) : id);
-    if (!ids.every((id) => Number.isSafeInteger(id) && id > 0)) throw new Error("攻略合集编号无效。");
+    if (!ids.every((id) => Number.isSafeInteger(id) && id > 0)) throw new Error($t("role-guide-collections.text_845ce94051"));
     return { source, collection_id: ids };
   });
 }
@@ -53,7 +56,7 @@ export async function readGuideAuthors(game: GuideGame, root?: string, settingsR
 }
 
 export async function responseBytes(response: Response, limit: number): Promise<Buffer> {
-  if (!response.ok || !response.body) throw new Error("原攻略来源无响应。");
+  if (!response.ok || !response.body) throw new Error($t("role-guide-collections.text_69f08d4450"));
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -62,7 +65,7 @@ export async function responseBytes(response: Response, limit: number): Promise<
       const { done, value } = await reader.read();
       if (done) return Buffer.concat(chunks, size);
       size += value.byteLength;
-      if (size > limit) throw new Error("原攻略来源响应超限。");
+      if (size > limit) throw new Error($t("role-guide-collections.text_b4ad6e6045"));
       chunks.push(value);
     }
   } finally {
@@ -170,7 +173,7 @@ export function createRoleGuideCollections(options: {
     url.searchParams.set("collection_id", String(id));
     const requestPosts = (async () => {
       const result = object(JSON.parse((await responseBytes(await request(url, 30_000), 24 * 1024 * 1024)).toString("utf8")));
-      if (result.retcode !== 0 || !Array.isArray(object(result.data).posts)) throw new Error("原攻略合集内容不可用。");
+      if (result.retcode !== 0 || !Array.isArray(object(result.data).posts)) throw new Error($t("role-guide-collections.text_4526e13f15"));
       return objects(object(result.data).posts);
     })();
     const reading: CollectionRead = {

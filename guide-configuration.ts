@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import { fileURLToPath } from "node:url";
 import { readMigrationSourceFile } from "../../lib/migration-files.ts";
 import type { GuideGame } from "./role-guide-input.ts";
@@ -19,7 +22,7 @@ export async function readGuidesConfiguration(root = installation): Promise<Reco
   if (!input) return {};
   const config = Bun.YAML.parse(input.bytes.toString("utf8"));
   if (config === null || config === undefined) return {};
-  if (typeof config !== "object" || Array.isArray(config)) throw new TypeError("攻略配置须为 YAML 映射。");
+  if (typeof config !== "object" || Array.isArray(config)) throw new TypeError($t("guide-configuration.text_bb5e06e280"));
   return config as Record<string, unknown>;
 }
 

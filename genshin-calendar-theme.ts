@@ -1,14 +1,17 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 // Calendar.getCharData and meta-gs/material/daily.js from Miao-Plugin (MIT).
 import { join } from "node:path";
 import { readGuideFile } from "./role-image-files.ts";
 import { safeGuideName } from "./role-guide-input.ts";
 
 const talents = [
-  ["自由", "繁荣", "浮世", "诤言", "公平", "角逐", "月光", "慈爱"],
-  ["抗争", "勤劳", "风雅", "巧思", "正义", "焚燔", "乐园", "坚忍"],
-  ["诗文", "黄金", "天光", "笃行", "秩序", "纷争", "浪迹", "荣光"],
+  [$t("genshin-calendar-theme.text_d1047eed5d"), $t("genshin-calendar-theme.text_b28c4dbf42"), $t("genshin-calendar-theme.text_36ea39c9aa"), $t("genshin-calendar-theme.text_26e4c50e4b"), $t("genshin-calendar-theme.text_bcefdeff3f"), $t("genshin-calendar-theme.text_9786bee8c7"), $t("genshin-calendar-theme.text_33c4b04477"), $t("genshin-calendar-theme.text_5cc3c16a14")],
+  [$t("genshin-calendar-theme.text_b0016d937e"), $t("genshin-calendar-theme.text_81dcb34d9e"), $t("genshin-calendar-theme.text_0b829e82db"), $t("genshin-calendar-theme.text_2fbb66d6ed"), $t("genshin-calendar-theme.text_1ddaa4cb37"), $t("genshin-calendar-theme.text_79f4146091"), $t("genshin-calendar-theme.text_34ba55ee06"), $t("genshin-calendar-theme.text_87bb71140b")],
+  [$t("genshin-calendar-theme.text_d4d2194cd7"), $t("genshin-calendar-theme.text_bbb72f61f1"), $t("genshin-calendar-theme.text_0008bef9ff"), $t("genshin-calendar-theme.text_336ccda3a4"), $t("genshin-calendar-theme.text_c2c1845c3b"), $t("genshin-calendar-theme.text_988ca3fd4e"), $t("genshin-calendar-theme.text_adbda297b3"), $t("genshin-calendar-theme.text_5af16a87ad")],
 ] as const;
-const locations = ["蒙德", "璃月", "稻妻", "须弥", "枫丹", "纳塔", "挪德卡莱", "至冬"];
+const locations = [$t("genshin-calendar-theme.text_6b557bf926"), $t("genshin-calendar-theme.text_8c78af3e64"), $t("genshin-calendar-theme.text_0b93dbd19e"), $t("genshin-calendar-theme.text_68335fcf17"), $t("genshin-calendar-theme.text_e8ac469478"), $t("genshin-calendar-theme.text_979954d006"), $t("genshin-calendar-theme.text_3e929dfa54"), $t("genshin-calendar-theme.text_488a37f68b")];
 const regionColors = ["#37c9b8", "#bca244", "#ac60c9", "#54b640", "#557dd6", "#cc3333", "#e6e6fa", "#a5fcfc"];
 const china = 8 * 3_600_000;
 const day = 86_400_000;
@@ -67,7 +70,7 @@ export async function genshinCalendarExtras(root: string, start: number, now: nu
   const weekday = new Date(now + china - 4 * 3_600_000).getUTCDay();
   const families = weekday === 0 ? talents : talents.slice((weekday - 1) % 3, (weekday - 1) % 3 + 1);
   const materials = families.flatMap((entries) => entries.map((name, index) => {
-    const item = `「${name}」的哲学`;
+    const item = $t("genshin-calendar-theme.text_989e7d532a", { "name": name });
     const roles = characters.filter((role) => role.talent === item).sort((a, b) => b.star - a.star || b.id - a.id);
     return { name, region: locations[index]!, color: regionColors[index]!, roles, item };
   })).filter(({ roles }) => roles.length);

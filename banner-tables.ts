@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import { join } from "node:path";
 import type { CommandReply } from "../../lib/commands.ts";
 import type { OriginalRoleResources } from "./original-role-resources.ts";
@@ -11,10 +14,10 @@ export function createBannerTables(resources: Pick<OriginalRoleResources, "curre
   const find = createOriginalImageLookup(resources, fallbacks);
 
   async function lookup(files: readonly string[]): Promise<CommandReply> {
-    const title = "复刻时间表";
+    const title = $t("banner-tables.text_56bb6c2f79");
     const { images, missing } = await find(files.map(file => join("Banners", file)));
-    if (!images.length) return "原复刻表暂不可用，请稍后再试。";
-    const notice = missing.length && `原复刻表暂缺${missing.map(file => file.slice("Banners/".length, -4)).join("、")}。`;
+    if (!images.length) return $t("banner-tables.text_7c5fc71e60");
+    const notice = missing.length && $t("banner-tables.text_d0f7ae914c", { "value1": missing.map(file => file.slice("Banners/".length, -4)).join("、") });
     if (images.length === 1) return notice ? [notice, images[0]!] : images[0]!;
     const nodes = [title, ...(notice ? [notice] : []), ...images];
     return forward ? { type: "forward", nodes } : nodes;

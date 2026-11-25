@@ -1,9 +1,12 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import { mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { lockFile } from "../../lib/file-lock.ts";
 import { guideGames, moraSourcePath, safeGuideName, type GuideGame } from "./role-guide-input.ts";
 import { findGuidePack, isGuideImage, matchesGuideImage, readGuideFile, roleImageLimit, writeGuideFile, type GuideImage } from "./role-image-files.ts";
-import { fetchGuideBlobs, guideBlobId, guideSourceRef, guideSource, prepareGuideSourceGit } from "./team-resources.ts";
+import { fetchGuideBlobs, guideBlobId, guideSourceRef, guideSource, GuideSourceGitError, prepareGuideSourceGit } from "./team-resources.ts";
 
 const revision = /^[0-9a-f]{40}$/u;
 type Blob = { readonly source: string; readonly hash: string };
@@ -108,7 +111,7 @@ export function createRoleResourcePack(options: {
     try {
       signal.throwIfAborted();
       await mkdir(directory, { recursive: true, mode: 0o700 });
-      const lock = await lockFile(join(directory, "refresh.lock"), "角色攻略");
+      const lock = await lockFile(join(directory, "refresh.lock"), $t("role-resource-pack.text_0a2b0a7356"));
       let temporary: string | undefined;
       try {
         const current = await readPack(directory) ?? retained;
@@ -131,11 +134,11 @@ export function createRoleResourcePack(options: {
           const source = options.references ? referenceSource(game, name, author, namePart) : matchesGuideImage(namePart, name) ? author : undefined;
           if (!source || renamed.has(source) || (path === originalPath && files.has(source))) continue;
           const hash = /^100644 blob ([0-9a-f]{40})$/u.exec(metadata ?? "")?.[1];
-          if (!hash) throw new Error("角色攻略原图格式无效。");
+          if (!hash) throw new Error($t("role-resource-pack.text_ac90b6e095"));
           files.set(source, hash);
           if (path !== originalPath) renamed.add(source);
         }
-        if (files.size > 24) throw new Error("角色攻略来源数超限。");
+        if (files.size > 24) throw new Error($t("role-resource-pack.text_a049a431c8"));
         const persisted = new Map<string, Buffer>();
         for (const [index, { hash }] of (current?.files ?? []).entries()) {
           const bytes = current?.images[index]?.bytes;
@@ -157,9 +160,9 @@ export function createRoleResourcePack(options: {
           if (!bytes) {
             const limit = source === referenceNotes ? notesLimit : roleImageLimit;
             const size = Number((await git(["cat-file", "-s", hash])).toString().trim());
-            if (!Number.isSafeInteger(size) || size < 1 || size > limit) throw new Error("角色攻略资源大小无效。");
+            if (!Number.isSafeInteger(size) || size < 1 || size > limit) throw new Error($t("role-resource-pack.text_6d9c147313"));
             bytes = await git(["cat-file", "blob", hash], undefined, limit);
-            if (bytes.byteLength !== size || guideBlobId(bytes) !== hash || !validFile(source, bytes)) throw new Error("角色攻略资源不完整。");
+            if (bytes.byteLength !== size || guideBlobId(bytes) !== hash || !validFile(source, bytes)) throw new Error($t("role-resource-pack.text_5cb9266475"));
           }
           if (!persisted.has(hash)) {
             signal.throwIfAborted();
@@ -167,7 +170,7 @@ export function createRoleResourcePack(options: {
             persisted.set(hash, bytes);
           }
           total += bytes.byteLength;
-          if (total > 48 * 1024 * 1024) throw new Error("角色攻略原图总大小超限。");
+          if (total > 48 * 1024 * 1024) throw new Error($t("role-resource-pack.text_514dc15847"));
           results.push({ source, bytes });
         }
         signal.throwIfAborted();
@@ -183,8 +186,8 @@ export function createRoleResourcePack(options: {
         }
       }
     } catch (error) {
-      if (!signal.aborted && error instanceof Error && error.message.startsWith("无法读取上游攻略资源")) {
-        console.warn("[guides] 角色攻略资源无法刷新，保留已有原图。", error.message);
+      if (!signal.aborted && error instanceof GuideSourceGitError) {
+        console.warn($t("role-resource-pack.text_bd8b9e8992"), error.message);
       }
       return retained && hasImage(retained.images) ? retained.images : localFiles(game, name);
     }

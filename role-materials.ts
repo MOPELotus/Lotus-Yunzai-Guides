@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import { join } from "node:path";
 import type { CommandReply } from "../../lib/commands.ts";
 import { createRoleGuideCollections, type GuideFetch } from "./role-guide-collections.ts";
@@ -53,7 +56,7 @@ export function createRoleMaterials({ cache, legacy, fetch: transport, signal }:
     const update = Boolean(match[2]);
     const role = resolveGuideRole(match[3]!, game);
     if (!role) return;
-    if (typeof role === "string" || ["8001", "8003"].includes(role.id ?? "")) return "暂无主角素材。";
+    if (typeof role === "string" || ["8001", "8003"].includes(role.id ?? "")) return $t("role-materials.text_52970d1efb");
     if (!safeGuideName(role.name)) return;
     const key = `${game}/${role.name}`;
     const refreshKey = `${key}/refresh`;
@@ -66,8 +69,8 @@ export function createRoleMaterials({ cache, legacy, fetch: transport, signal }:
     }
     return current.then((bytes): CommandReply => {
       if (signal?.aborted) return [];
-      if (!bytes) return `暂无${role.name}的原素材图，可用角色图鉴查看养成材料。`;
-      if (limit !== undefined && bytes.byteLength > limit) return `${role.name}的素材图超过当前会话的单图大小上限。`;
+      if (!bytes) return $t("role-materials.text_1e977905d7", { "name": role.name });
+      if (limit !== undefined && bytes.byteLength > limit) return $t("role-materials.text_6101723621", { "name": role.name });
       return { type: "image", file: bytes };
     });
   };

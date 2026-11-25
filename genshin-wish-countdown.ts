@@ -1,9 +1,12 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import type { CommandReply } from "../../lib/commands.ts";
 import { calendarTransport, officialCalendarImage, readCalendarBytes, type CalendarData } from "./calendar-data.ts";
 import { isGuideImage } from "./role-image-files.ts";
 
 const command = /^(?:#|＃)*(?:原神)?卡池(?:剩余|剩下)?时间$/u;
-const unavailable = "暂无法从国服官方公告核验当前卡池时间，请稍后重试。";
+const unavailable = $t("genshin-wish-countdown.text_74f54f95a5");
 const day = 86_400_000;
 const chinaOffset = 28_800_000;
 
@@ -35,7 +38,7 @@ export async function genshinWishCountdown(source: () => Promise<CalendarData>, 
   }));
   if (signal?.aborted) return [];
   const completed = now();
-  if (active.some(row => completed < row.start || completed >= row.deadline)) return "卡池时段已变化，请重新查询。";
+  if (active.some(row => completed < row.start || completed >= row.deadline)) return $t("genshin-wish-countdown.text_27432ad48a");
   const periods = new Map<string, { start: number; end: number; deadline: number; indices: number[] }>();
   for (const [index, { start, end, deadline }] of active.entries()) {
     const key = `${start}/${deadline}`;
@@ -43,9 +46,9 @@ export async function genshinWishCountdown(source: () => Promise<CalendarData>, 
     if (period) period.indices.push(index);
     else periods.set(key, { start, end, deadline, indices: [index] });
   }
-  return ["原神当前卡池（国服）\n", ...[...periods.values()].flatMap(({ start, end, deadline, indices }) => [
+  return [$t("genshin-wish-countdown.text_41c687c05b"), ...[...periods.values()].flatMap(({ start, end, deadline, indices }) => [
     `\n${date(start)} ~ ${date(end, true)}\n`,
     ...indices.flatMap(index => [`${active[index]!.title}\n`, ...(artwork[index] ? [artwork[index]!] : [])]),
-    `\n卡池剩余时间：${Math.ceil((deadline - completed) / day)}天\n`,
+    $t("genshin-wish-countdown.text_c4a7d5858b", { "value1": Math.ceil((deadline - completed) / day) }),
   ])];
 }

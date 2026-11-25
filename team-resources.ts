@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import { createInitializationProgress } from "../../lib/initialization-progress.ts";
 import { reportResourceProgress, type ResourceProgressCallback } from "../../lib/resource-progress.ts";
 // Source and refresh schedule adapted from Mora-Plugin apps/help.js.
@@ -12,6 +15,13 @@ import { moraSourcePath } from "./role-guide-input.ts";
 
 export const guideSource = "https://gitee.com/Rrrrrrray/mora-plugin-res.git";
 export const guideSourceRef = "refs/heads/master";
+export class GuideSourceGitError extends Error {
+  readonly code = "guide-source-git";
+  constructor(command: string) {
+    super($t("team-resources.text_a9ec0cb77b", { "command": command }));
+    this.name = "GuideSourceGitError";
+  }
+}
 const sourcePath = "Genshin/TeamGuides";
 const indexPath = "teamGuides.yaml";
 const gitId = /^[0-9a-f]{40}$/u;
@@ -33,14 +43,14 @@ function readGitTree(output: string, path: string): Map<string, string> {
   for (const line of output.split("\0")) {
     if (!line) continue;
     const [metadata, source] = line.split("\t", 2);
-    if (!source?.startsWith(`${path}/`)) throw new Error("配队资源路径无效。");
+    if (!source?.startsWith(`${path}/`)) throw new Error($t("team-resources.text_28c904aa11"));
     const file = source.slice(path.length + 1);
     if (!resourcePaths(file)) continue;
     const id = /^100644 blob ([0-9a-f]{40})$/u.exec(metadata ?? "")?.[1];
-    if (!id) throw new Error("配队资源须为原仓库的普通文件。");
+    if (!id) throw new Error($t("team-resources.text_c1fe835528"));
     objects.set(file, id);
   }
-  if (!objects.has(indexPath) || objects.size > 500) throw new Error("配队资源清单无效。");
+  if (!objects.has(indexPath) || objects.size > 500) throw new Error($t("team-resources.text_b4d89c0fa0"));
   return objects;
 }
 
@@ -80,7 +90,7 @@ export async function verifyGuideSnapshot(directory: string, files: readonly {
     const valid = await Promise.all(batch.map(({ path, hash, maxBytes }) =>
       readLocalGuideBlob(directory, path, hash, maxBytes).then(Boolean)));
     signal.throwIfAborted();
-    reportResourceProgress(onProgress, signal, "guides-check", "核对攻略快照", start + batch.length, files.length);
+    reportResourceProgress(onProgress, signal, "guides-check", $t("team-resources.text_a8f780ca19"), start + batch.length, files.length);
     if (valid.some(result => !result)) return false;
   }
   return true;
@@ -96,7 +106,7 @@ export async function cleanGuideStages(root: string, prefix: ".refresh-" | ".ins
 
 function gitOptions(source: string) {
   const protocol = new URL(source).protocol;
-  if (protocol !== "https:" && protocol !== "file:") throw new Error("配队资源 Git 协议不受支持。");
+  if (protocol !== "https:" && protocol !== "file:") throw new Error($t("team-resources.text_e5c15ba654"));
   return {
     PATH: process.env.PATH, LC_ALL: "C", GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: "1",
     GIT_TERMINAL_PROMPT: "0", GIT_ALLOW_PROTOCOL: protocol.slice(0, -1), GIT_NO_REPLACE_OBJECTS: "1",
@@ -116,7 +126,7 @@ async function clearGuideGitTransientFiles(directory: string) {
 
 function gitClient(directory: string, source: string, signal: AbortSignal, onProgress?: ResourceProgressCallback) {
   const binary = Bun.which("git", { PATH: process.env.PATH });
-  if (!binary) throw new Error("下载攻略资源需要 Git。");
+  if (!binary) throw new Error($t("team-resources.text_ebd17512d3"));
   const env = gitOptions(source);
   return async (args: readonly string[], stdin?: Uint8Array, maxBuffer = maxIndex): Promise<Buffer> => {
     const active = args.includes("fetch") ? AbortSignal.any([signal, AbortSignal.timeout(10 * 60_000)]) : signal;
@@ -153,7 +163,7 @@ function gitClient(directory: string, source: string, signal: AbortSignal, onPro
     try {
       const [output, code] = await Promise.all([new Response(child.stdout).arrayBuffer(), child.exited, diagnostics]);
       active.throwIfAborted();
-      if (code !== 0 || output.byteLength > maxBuffer) throw new Error(`无法读取上游攻略资源（Git ${args[0]}）。`);
+      if (code !== 0 || output.byteLength > maxBuffer) throw new GuideSourceGitError(args[0] ?? "");
       return Buffer.from(output);
     } catch (error) {
       stop();
@@ -173,7 +183,7 @@ function fetchGuideObjects(git: ReturnType<typeof gitClient>, arguments_: readon
 }
 
 export async function prepareGuideSourceGit(directory: string, source: string, signal: AbortSignal, onProgress?: ResourceProgressCallback) {
-  reportResourceProgress(onProgress, signal, "guides-git", "同步上游攻略资源索引");
+  reportResourceProgress(onProgress, signal, "guides-git", $t("team-resources.text_928d88596e"));
   // Callers hold their refresh lock; retain completed packs, discard interrupted writes.
   await clearGuideGitTransientFiles(directory);
   const git = gitClient(directory, source, signal, onProgress);
@@ -230,17 +240,17 @@ export function createTeamResources(options: {
     const timeout = AbortSignal.timeout(180_000);
     const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
     signal.throwIfAborted();
-    const terminal = options.logProgress && !options.onProgress ? createInitializationProgress("配队资源", { signal }) : undefined;
+    const terminal = options.logProgress && !options.onProgress ? createInitializationProgress($t("team-resources.text_5c071b4dbc"), { signal }) : undefined;
     const onProgress = options.onProgress ?? terminal?.update;
     let succeeded = false;
     const report = (stage: string, message: string, completed?: number, total?: number) =>
       reportResourceProgress(onProgress, signal, stage, message, completed, total);
-    report("guides-team", "准备配队资源");
+    report("guides-team", $t("team-resources.text_ed6e9d1788"));
     let lock: Awaited<ReturnType<typeof lockFile>> | undefined;
     let temporary: string | undefined;
     try {
       await mkdir(root, { recursive: true, mode: 0o700 });
-      lock = await lockFile(join(root, "refresh.lock"), "配队资源");
+      lock = await lockFile(join(root, "refresh.lock"), $t("team-resources.text_5c071b4dbc"));
       await cleanGuideStages(root, ".refresh-");
       await writeGuideFile(pending, "");
       temporary = await mkdtemp(join(root, ".refresh-"));
@@ -252,7 +262,7 @@ export function createTeamResources(options: {
       const renamedTree = await resolveTree(currentSourcePath).catch(() => undefined);
       const path = renamedTree ? currentSourcePath : sourcePath;
       const tree = renamedTree ?? await resolveTree(path);
-      if (!gitId.test(tree)) throw new Error("上游配队目录无效。");
+      if (!gitId.test(tree)) throw new Error($t("team-resources.text_008a2bcfa0"));
       const previous = await managedSnapshot(root);
       const objects = readGitTree((await git(["ls-tree", "-r", "-z", guideSourceRef, "--", path])).toString("utf8"), path);
       if (!force && previous?.tree === tree && await verifyGuideSnapshot(previous.directory,
@@ -267,13 +277,13 @@ export function createTeamResources(options: {
       let total = 0;
       function retain(hash: string, bytes: Buffer) {
         total += bytes.byteLength;
-        if (total > maxSnapshot) throw new Error("上游配队文件大小无效。");
+        if (total > maxSnapshot) throw new Error($t("team-resources.text_6a9582f87c"));
         known.set(hash, bytes);
       }
       const localDirectories = previous ? [previous.directory, ...fallbacks] : fallbacks;
       let checkedCount = 0;
       for (const [file, hash] of objects) {
-        report("guides-team-check", "核对配队缓存", checkedCount++, objects.size);
+        report("guides-team-check", $t("team-resources.text_649ed49a72"), checkedCount++, objects.size);
         if (known.has(hash)) continue;
         const limit = file === indexPath ? maxIndex : maxImage;
         let bytes = await readLocalGuideBlob(objectDirectory, hash, hash, limit);
@@ -283,40 +293,40 @@ export function createTeamResources(options: {
         }
         if (bytes) retain(hash, bytes);
       }
-      report("guides-team-check", "配队缓存核对完成", objects.size, objects.size);
+      report("guides-team-check", $t("team-resources.text_ba4fe507fe"), objects.size, objects.size);
       const missing = [...new Map([...objects].filter(([, hash]) => !known.has(hash)).map(([file, hash]) => [hash, file]))];
       for (let start = 0; start < missing.length; start += 8) {
         const batch = missing.slice(start, start + 8);
-        report("guides-team-download", "下载配队资源", start, missing.length);
+        report("guides-team-download", $t("team-resources.text_67ecea62ab"), start, missing.length);
         await fetchGuideBlobs(git, batch.map(([hash]) => hash));
         for (const [index, [hash, file]] of batch.entries()) {
           const bytes = await git(["cat-file", "blob", hash], undefined, file === indexPath ? maxIndex : maxImage);
           if (guideBlobId(bytes) !== hash || (file !== indexPath && !bytes.subarray(0, 8).equals(pngHeader))) {
-            throw new Error("上游配队文件不完整。");
+            throw new Error($t("team-resources.text_25b8e529c1"));
           }
           signal.throwIfAborted();
           retain(hash, bytes);
           await writeGuideFile(join(objectDirectory, hash), bytes);
-          report("guides-team-download", `已取得 ${file}`, start + index + 1, missing.length);
+          report("guides-team-download", $t("team-resources.text_1cb4236449", { "file": file }), start + index + 1, missing.length);
         }
       }
       const index = known.get(objects.get(indexPath)!);
-      if (!index || index.byteLength > maxIndex) throw new Error("上游缺少可用的配队索引。");
+      if (!index || index.byteLength > maxIndex) throw new Error($t("team-resources.text_8fedba8901"));
       const expected = indexedTeamImages(index.toString("utf8"));
-      if (!expected.length || expected.some((file) => !objects.has(file))) throw new Error("上游配队索引缺少原图。");
+      if (!expected.length || expected.some((file) => !objects.has(file))) throw new Error($t("team-resources.text_ed68fea769"));
 
       const stage = join(temporary, "stage");
       let size = 0;
       let publishedCount = 0;
       for (const [file, hash] of objects) {
         const bytes = known.get(hash);
-        if (!bytes || (file !== indexPath && !bytes.subarray(0, 8).equals(pngHeader))) throw new Error("上游配队文件不完整。");
+        if (!bytes || (file !== indexPath && !bytes.subarray(0, 8).equals(pngHeader))) throw new Error($t("team-resources.text_25b8e529c1"));
         size += bytes.byteLength;
-        if (size > maxSnapshot) throw new Error("上游配队文件大小无效。");
+        if (size > maxSnapshot) throw new Error($t("team-resources.text_6a9582f87c"));
         const target = join(stage, file);
         await mkdir(dirname(target), { recursive: true });
         await writeFile(target, bytes, { flag: "wx" });
-        report("guides-team-install", "保存配队资源", ++publishedCount, objects.size);
+        report("guides-team-install", $t("team-resources.text_859a05c1f5"), ++publishedCount, objects.size);
       }
       const next = `snapshots/${tree}-${crypto.randomUUID()}`;
       const pointer = join(temporary, "pointer");
@@ -334,7 +344,7 @@ export function createTeamResources(options: {
         if (temporary) await rm(temporary, { recursive: true, force: true });
       } finally {
         if (succeeded) terminal?.complete();
-        else terminal?.fail(signal.aborted ? "资源准备已中止" : "资源准备失败");
+        else terminal?.fail(signal.aborted ? $t("team-resources.text_3499bdb4ca") : $t("team-resources.text_33382d5eff"));
         lock?.close();
       }
     }

@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import type { CommandReply } from "../../lib/commands.ts";
 import { calendarTime, calendarTransport, officialCalendarImage, readCalendarBytes, readCalendarJson,
   zzzCalendarContentUrl, zzzCalendarListUrl } from "./calendar-data.ts";
@@ -5,8 +8,8 @@ import { isGuideImage, roleImageLimit } from "./role-image-files.ts";
 
 const command = /^(?:[#%％/]?(?:zzz|ZZZ|绝区零)|[%％]|#绝区零(?:zzz|ZZZ))cal$/u;
 const minute = 60_000;
-const missingCalendar = "未找到活动日历";
-const missingImage = "未找到活动日历图片";
+const missingCalendar = $t("zzz-official-calendar.text_3d3b06be2c");
+const missingImage = $t("zzz-official-calendar.text_0c867c717c");
 
 function object(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -50,12 +53,12 @@ export function createZzzOfficialCalendar(options: {
 
   async function load(): Promise<Result> {
     const list = await request(zzzCalendarListUrl);
-    if (!list) return { status: "failed", reply: "获取活动列表失败" };
+    if (!list) return { status: "failed", reply: $t("zzz-official-calendar.text_e56348c422") };
     const timestamp = typeof list.t === "string" || typeof list.t === "number" ? String(list.t) : "";
     const detailUrl = new URL(zzzCalendarContentUrl);
     detailUrl.searchParams.set("t", /^[\w.-]{1,128}$/u.test(timestamp) && timestamp !== "0" ? timestamp : String(now()));
     const detail = await request(detailUrl.href);
-    if (!detail) return { status: "failed", reply: "获取活动日历失败，请稍后再试。" };
+    if (!detail) return { status: "failed", reply: $t("zzz-official-calendar.text_8d35469515") };
     const article = rows(detail.list).find(({ title, subtitle }) => typeof title === "string" && title.includes("日历") &&
       typeof subtitle === "string" && subtitle.includes("活动日历"));
     if (typeof article?.content !== "string" || !article.content) return { status: "missing", reply: missingCalendar };
@@ -71,18 +74,18 @@ export function createZzzOfficialCalendar(options: {
     if (!url) return { status: "missing", reply: missingImage };
     try {
       const file = await readCalendarBytes(await transport(url), roleImageLimit);
-      if (!isGuideImage(file)) throw new Error("日历原图格式无效。");
+      if (!isGuideImage(file)) throw new Error($t("zzz-official-calendar.text_368d5a68ac"));
       const expiresAt = Math.min(end ?? Infinity, now() + 6 * 60 * minute);
       if (now() >= expiresAt) return { status: "missing", reply: missingCalendar };
       return { status: "image", reply: { type: "image", file }, url, expiresAt };
     } catch {
-      return { status: "failed", reply: "获取活动日历图片失败，请稍后再试。", url };
+      return { status: "failed", reply: $t("zzz-official-calendar.text_6d83e69ba0"), url };
     }
   }
 
   function originalImage(result: Extract<Result, { status: "image" }>, limit: number) {
     if (result.reply.file.byteLength <= limit) return result.reply;
-    return `当前会话无法发送这张官方原图，请打开原图链接。\n${result.url}`;
+    return $t("zzz-official-calendar.text_3298c8161e", { "url": result.url });
   }
 
   async function lookup(limit = Infinity): Promise<CommandReply> {
@@ -102,7 +105,7 @@ export function createZzzOfficialCalendar(options: {
     }
     if (result.status === "image") return now() < result.expiresAt ? originalImage(result, limit) : missingCalendar;
     if (result.status === "failed" && retained && now() < retained.expiresAt && (!result.url || result.url === retained.url)) {
-      return ["暂时无法刷新，以下为上次取得的官方活动日历。", originalImage(retained, limit)];
+      return [$t("zzz-official-calendar.text_2d75141731"), originalImage(retained, limit)];
     }
     return result.reply;
   }

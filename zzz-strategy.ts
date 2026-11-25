@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { CommandReply } from "../../lib/commands.ts";
@@ -11,19 +14,19 @@ import { readGuideFile, readGuideImage, writeGuideFile } from "./role-image-file
 
 // ZZZ-Plugin dist/lib/guides.js, 2057599. Public MiYouShe ZZZ collections in source-number order.
 const sources = [
-  { source: "新艾利都快讯", collection_id: [2712859] },
-  { source: "清茶沐沐Kiyotya", collection_id: [2727116] },
-  { source: "小橙子阿", collection_id: [2721968] },
-  { source: "猫冬", collection_id: [2724610] },
-  { source: "月光中心", collection_id: [2722266] },
-  { source: "苦雪的清心花凉糕Suki", collection_id: [2723586] },
-  { source: "HoYo青枫", collection_id: [2716049] },
+  { source: $t("zzz-strategy.text_1acdcd6272"), collection_id: [2712859] },
+  { source: $t("zzz-strategy.text_b86b8f6f77"), collection_id: [2727116] },
+  { source: $t("zzz-strategy.text_8176f01698"), collection_id: [2721968] },
+  { source: $t("zzz-strategy.text_adc4aaf292"), collection_id: [2724610] },
+  { source: $t("zzz-strategy.text_a7e9bb4364"), collection_id: [2722266] },
+  { source: $t("zzz-strategy.text_b4fa8f0b66"), collection_id: [2723586] },
+  { source: $t("zzz-strategy.text_a647fad4b7"), collection_id: [2716049] },
 ] as const;
 
 const help = [
-  "绝区零编号攻略",
-  "用 %艾莲攻略2 选择来源，用 %艾莲攻略all 查看多个来源。要重新取图，可发送 %更新艾莲攻略2。",
-  "主人可用 %设置默认攻略2 或 %设置默认攻略all，以及 %设置所有攻略显示个数4。",
+  $t("zzz-strategy.text_5387cf83b1"),
+  $t("zzz-strategy.text_5fe2e46ce8"),
+  $t("zzz-strategy.text_1492f10d0c"),
   ...sources.map(({ source }, index) => `${index + 1}. ${source}`),
 ].join("\n");
 const prefix = /^(?:[#%％/]?(?:绝区零|zzz)|[%％])/iu;
@@ -61,7 +64,7 @@ function configNumber(value: unknown) {
 }
 
 export const zzzStrategyOptions = [
-  { value: 0, label: "全部来源" },
+  { value: 0, label: $t("zzz-strategy.text_9f357adb61") },
   ...sources.map((author, index) => ({ value: index + 1, label: `${index + 1} · ${author.source}` })),
 ];
 
@@ -88,7 +91,7 @@ export function createZzzStrategySettings(options: { readonly cache: string; rea
       }
       if (canWrite && !canWrite()) throw new GuideSettingsError("permission");
       await mkdir(options.cache, { recursive: true, mode: 0o700 });
-      const lock = await lockFile(join(options.cache, ".zzz-strategy.sqlite"), "绝区零攻略设置");
+      const lock = await lockFile(join(options.cache, ".zzz-strategy.sqlite"), $t("zzz-strategy.text_5c3e532279"));
       try {
         const { effective, current } = await readValues();
         if (previous && (previous.default_guide !== effective.default_guide ||
@@ -144,7 +147,7 @@ export function createZzzStrategy(options: {
 
   function one(name: string, number: number, update: boolean): Promise<GuideReply> {
     const author = sources[number - 1]!;
-    const missing = `暂无${name}攻略（${author.source}）。`;
+    const missing = $t("zzz-strategy.text_16af525009", { "name": name, "source": author.source });
     return options.operation(`zzz/${name}/numbered/${number}`, update, async () => {
       const filename = `role_guide_${name}.png`;
       const local = join("numbered", "ZenlessZoneZero", author.source, filename);
@@ -180,21 +183,21 @@ export function createZzzStrategy(options: {
       if (/^攻略(?:说明|帮助)$/u.test(command)) return help;
       const choice = /^(?:设置默认攻略(\d+|all)|设置所有攻略显示个数(\d+))$/iu.exec(command);
       if (choice) {
-        if (!isMaster) return "只有主人可以设置绝区零攻略来源。";
+        if (!isMaster) return $t("zzz-strategy.text_20005a38e7");
         const [defaultSource, maximum] = [choice[1], choice[2]];
         const selected = defaultSource?.toLowerCase() === "all" ? 0 : Number(defaultSource ?? maximum);
         if (!validInteger(selected, maximum === undefined ? 0 : 1)) {
-          return maximum === undefined ? "请选择攻略编号 0–7 或 all。" : "所有攻略显示个数须为 1–7。";
+          return maximum === undefined ? $t("zzz-strategy.text_f1ade3a6a7") : $t("zzz-strategy.text_64f2ef0e1b");
         }
         const key = maximum === undefined ? "default_guide" : "max_forward_guides";
         return set(key, selected).then(() => maximum === undefined
-          ? `已设置绝区零默认攻略来源${selected ? ` ${selected}（${sources[selected - 1]!.source}）` : "为全部"}。`
-          : `已设置绝区零所有攻略显示个数为 ${selected}。`, () => "保存绝区零攻略设置失败，请稍后再试。");
+          ? $t("zzz-strategy.text_3accd00fae", { "value1": selected ? ` ${selected}（${sources[selected - 1]!.source}）` : $t("zzz-strategy.text_62c74e680e") })
+          : $t("zzz-strategy.text_ddd4370c0d", { "selected": selected }), () => $t("zzz-strategy.text_2484f5af4d"));
       }
       const match = /^(更新|刷新)?(\S+?)攻略(\d+|all)?$/iu.exec(command);
       if (!match || (!match[3] && match[1] !== "刷新") || !safeGuideName(match[2]!)) return;
       const number = match[3] === undefined ? undefined : match[3].toLowerCase() === "all" ? 0 : Number(match[3]);
-      if (number !== undefined && !validInteger(number, 0)) return "攻略编号超出范围。请发送 %攻略帮助 查看来源。";
+      if (number !== undefined && !validInteger(number, 0)) return $t("zzz-strategy.text_e995d5a8a5");
       return lookup(match[2]!, !!match[1], number);
     },
   };

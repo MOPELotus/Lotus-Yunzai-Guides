@@ -1,0 +1,800 @@
+{
+  "language": "zh-CN",
+  "name": "简体中文",
+  "namespace": "guides",
+  "description": "攻略",
+  "sections": {
+    "abyss-references": {
+      "description": "攻略",
+      "source": "plugins/guides/abyss-references.ts"
+    },
+    "akasha-abyss": {
+      "description": "攻略",
+      "source": "plugins/guides/akasha-abyss.ts"
+    },
+    "akasha-card": {
+      "description": "攻略：图片卡片",
+      "source": "plugins/guides/akasha-card.ts"
+    },
+    "banner-tables": {
+      "description": "攻略",
+      "source": "plugins/guides/banner-tables.ts"
+    },
+    "calendar": {
+      "description": "攻略：日历",
+      "source": "plugins/guides/calendar.ts"
+    },
+    "calendar-card": {
+      "description": "攻略：日历 · 图片卡片",
+      "source": "plugins/guides/calendar-card.ts"
+    },
+    "calendar-data": {
+      "description": "攻略：日历",
+      "source": "plugins/guides/calendar-data.ts"
+    },
+    "calendar-schedule": {
+      "description": "攻略：日历 · 排期",
+      "source": "plugins/guides/calendar-schedule.ts"
+    },
+    "genshin-calendar-theme": {
+      "description": "攻略：原神 · 日历",
+      "source": "plugins/guides/genshin-calendar-theme.ts"
+    },
+    "genshin-strategy": {
+      "description": "攻略：原神",
+      "source": "plugins/guides/genshin-strategy.ts"
+    },
+    "genshin-wish-countdown": {
+      "description": "攻略：原神 · 模拟祈愿",
+      "source": "plugins/guides/genshin-wish-countdown.ts"
+    },
+    "guide-configuration": {
+      "description": "攻略",
+      "source": "plugins/guides/guide-configuration.ts"
+    },
+    "index": {
+      "description": "攻略",
+      "source": "plugins/guides/index.ts"
+    },
+    "original-role-resources": {
+      "description": "攻略",
+      "source": "plugins/guides/original-role-resources.ts"
+    },
+    "role-guide-collections": {
+      "description": "攻略",
+      "source": "plugins/guides/role-guide-collections.ts"
+    },
+    "role-guide-input": {
+      "description": "攻略",
+      "source": "plugins/guides/role-guide-input.ts"
+    },
+    "role-guides": {
+      "description": "攻略：攻略",
+      "source": "plugins/guides/role-guides.ts"
+    },
+    "role-materials": {
+      "description": "攻略",
+      "source": "plugins/guides/role-materials.ts"
+    },
+    "role-references": {
+      "description": "攻略",
+      "source": "plugins/guides/role-references.ts"
+    },
+    "role-resource-pack": {
+      "description": "攻略",
+      "source": "plugins/guides/role-resource-pack.ts"
+    },
+    "starrail-guide-history": {
+      "description": "攻略：星铁",
+      "source": "plugins/guides/starrail-guide-history.ts"
+    },
+    "starrail-strategy": {
+      "description": "攻略：星铁",
+      "source": "plugins/guides/starrail-strategy.ts"
+    },
+    "team-guides": {
+      "description": "攻略：攻略",
+      "source": "plugins/guides/team-guides.ts"
+    },
+    "team-resources": {
+      "description": "攻略",
+      "source": "plugins/guides/team-resources.ts"
+    },
+    "zzz-official-calendar": {
+      "description": "攻略：绝区零 · 日历",
+      "source": "plugins/guides/zzz-official-calendar.ts"
+    },
+    "zzz-strategy": {
+      "description": "攻略：绝区零",
+      "source": "plugins/guides/zzz-strategy.ts"
+    }
+  },
+  "messages": {
+    "abyss-references.text_12277d820b": "暂无{version}深渊阵容",
+    "abyss-references.text_8eaccf5bf5": "原深渊最低输出量图暂不可用，请稍后再试。",
+    "abyss-references.text_92d31fba90": "历代深渊12层最低输出量",
+    "abyss-references.text_b27a2737eb": "原神{version}深渊",
+    "abyss-references.text_c5e13f74d7": "原图暂缺{value1}。",
+    "akasha-abyss.text_1f3846e427": "虚空深渊帮助",
+    "akasha-abyss.text_2454def990": "虚空榜单的角色星级无效。",
+    "akasha-abyss.text_2ca2d1e82b": "虚空榜单的队伍名单无效。",
+    "akasha-abyss.text_3835dbd27d": "虚空深渊数据暂时不可用。",
+    "akasha-abyss.text_4b4bc73dc1": "虚空榜单的更新时间无效。",
+    "akasha-abyss.text_54595f6d35": "第 {page}/{pageCount} 页",
+    "akasha-abyss.text_57d32b4df7": "数据来源 akashadata.com · 更新时间 {date}",
+    "akasha-abyss.text_5ef4c1efb6": "虚空榜单的字段格式有误。",
+    "akasha-abyss.text_6814649ec6": "虚空榜单条数无效。",
+    "akasha-abyss.text_7ada4813e5": "{lead} · 暂无该星级使用率。",
+    "akasha-abyss.text_7f44f9d2f0": "#虚空深渊使用率 · 全部角色",
+    "akasha-abyss.text_838ac0ba92": "{half}队伍 · {sort}",
+    "akasha-abyss.text_85032a4f47": "{value1} · {count} 次 · {value3}% · {ratio}",
+    "akasha-abyss.text_8a56c6ab9d": "{rarity} 星角色使用率",
+    "akasha-abyss.text_9a0c4b9c07": "角色使用率",
+    "akasha-abyss.text_ac623ce2f3": "{lead} · 第 {page} 页暂无队伍。",
+    "akasha-abyss.text_b758e9f2f6": "队伍可查看上半、下半或全部，页码 1–7。榜单以来源更新日期为准。",
+    "akasha-abyss.text_b8adf97467": "{version} · 深渊12层",
+    "akasha-abyss.text_bd02cc06f3": "虚空榜单的原数据不完整。",
+    "akasha-abyss.text_d5eca5d077": "虚空榜单来源不可用。",
+    "akasha-abyss.text_d7ae308bdb": "虚空榜单内容超出限制。",
+    "akasha-abyss.text_d995a45872": "虚空榜单的文本无效。",
+    "akasha-abyss.text_dd1c9de2f2": "#虚空五星使用率 / #虚空四星使用率",
+    "akasha-abyss.text_e2679c710a": "虚空榜单的数值无效。",
+    "akasha-abyss.text_fc9f1fdaa0": "历史快照",
+    "akasha-card.text_472afe95aa": "第 {page}/{pageCount} 页 · 虚空深渊队伍 1–7",
+    "akasha-card.text_47985f9dc2": "Lotus-Yunzai · @容容容三岁 设计",
+    "akasha-card.text_7bab9605c6": "上下比",
+    "akasha-card.text_aeb9cf29e9": "出战数",
+    "akasha-card.text_cfa182f250": "低于 6%",
+    "akasha-card.text_ea438695f0": "满星率",
+    "banner-tables.text_56bb6c2f79": "复刻时间表",
+    "banner-tables.text_7c5fc71e60": "原复刻表暂不可用，请稍后再试。",
+    "banner-tables.text_d0f7ae914c": "原复刻表暂缺{value1}。",
+    "calendar-card.text_006148fb62": "日一二三四五六",
+    "calendar-card.text_127799c804": "活动列表",
+    "calendar-card.text_16b0a042a3": "{start}（{value2}后开始）",
+    "calendar-card.text_1bd5b8aea7": "{value1}分钟",
+    "calendar-card.text_26f9f67809": "按月轮换 · {value1}{end}",
+    "calendar-card.text_32f584bc7c": "分批结束：{value1} 至 {value2}",
+    "calendar-card.text_34fa33dbb3": "这段时间暂无公开活动",
+    "calendar-card.text_4ad11bf3eb": " · 公告详情暂不可用",
+    "calendar-card.text_4f0d66e2e2": "周{value1}",
+    "calendar-card.text_52a7fefd62": "结束时间以活动公告为准",
+    "calendar-card.text_69d527473f": "按月轮换 · ",
+    "calendar-card.text_76fed77dc3": "{value1} 后永久有效",
+    "calendar-card.text_8f5ecd9fc2": "生日",
+    "calendar-card.text_92a75f517c": "{value1}{end}（{value3}后结束）",
+    "calendar-card.text_b4baa30d48": "{value1}天",
+    "calendar-card.text_bb56bda25e": "当前会话的图片大小上限不足以发送完整日历。",
+    "calendar-card.text_d38262246e": "截止：{value1}",
+    "calendar-card.text_d63c6143d3": "当前时间：{value1}",
+    "calendar-card.text_e6ad509939": "{value1}日",
+    "calendar-card.text_f512482fac": "{value1}小时",
+    "calendar-card.text_f9e9306828": "永久开放",
+    "calendar-card.text_fa4962f757": "{value1}月",
+    "calendar-card.text_ffe1c0506d": " · 上次公告：{value1}",
+    "calendar-data.text_1cc5dca3e4": "新版本预下载开启",
+    "calendar-data.text_2519d7ed6c": "游戏公告时区变化。",
+    "calendar-data.text_2ed60bb2f3": "「剧变节点」",
+    "calendar-data.text_6230719c4b": "无法访问游戏官方公告。",
+    "calendar-data.text_623183459c": "游戏公告列表没有可识别的活动。",
+    "calendar-data.text_c7e9daf5db": "游戏公告响应格式变化。",
+    "calendar-data.text_d3b1db67e8": "游戏公告响应超限。",
+    "calendar-data.text_f6c14d1dc1": "「危局强袭」",
+    "calendar-schedule.text_1922089e92": "群聊名单已达上限。",
+    "calendar-schedule.text_1929dbad8b": "日历状态已由其他程序修改。",
+    "calendar-schedule.text_2b63a57e40": "定时日历",
+    "calendar-schedule.text_392b3c6616": "请发送群号，一次一个。发送「取消」可退出。",
+    "calendar-schedule.text_3c7a7da6e6": "日历任务已保存，暂时无法启动。",
+    "calendar-schedule.text_3fb24bd660": "时间或任务类型无效。用法：#定时添加任务 time=\"0 9 * * *\" S（S 星铁，G 原神，* 两者）。",
+    "calendar-schedule.text_400ae55a6d": "请输入有效群号，或发送「取消」。",
+    "calendar-schedule.text_4742cbb6a9": "群聊名单包含无效群号。",
+    "calendar-schedule.text_484d556139": "无",
+    "calendar-schedule.text_4b4ca7e1eb": "添加成功：在 {cron} 执行发送 {value2}。",
+    "calendar-schedule.text_5205fa08db": "日历任务列表无效。",
+    "calendar-schedule.text_65e93eb60e": "该定时任务已存在。",
+    "calendar-schedule.text_696e51e73c": "日历副本格式无效或包含旧版不能表示的配置。",
+    "calendar-schedule.text_6fcdb835e0": "未找到新版定时日历副本。",
+    "calendar-schedule.text_71d9706d5e": "日历状态文件无效。",
+    "calendar-schedule.text_80e4debfc8": "原神和星铁日历",
+    "calendar-schedule.text_832d4d15b4": "定时日历配置暂不可用。",
+    "calendar-schedule.text_8f64c69a95": "已取消添加群聊。",
+    "calendar-schedule.text_90d8c13fb9": "日历状态文件读取期间已变更。",
+    "calendar-schedule.text_92c201c29a": "只有主人可以管理定时日历。",
+    "calendar-schedule.text_a78bcddcec": "日历状态超出大小上限。",
+    "calendar-schedule.text_ac9cecfcdd": "定时任务列表：\n",
+    "calendar-schedule.text_b261acfe28": "日历任务无效。",
+    "calendar-schedule.text_b7839603ed": "日历任务时间或类型无效。",
+    "calendar-schedule.text_b842be8a1b": "日历状态版本无效。",
+    "calendar-schedule.text_b96173785e": "{id} 已在名单中。",
+    "calendar-schedule.text_c969a31cec": "群聊列表：\n白名单：{value1}\n黑名单：{value2}",
+    "calendar-schedule.text_da9688984c": "暂无任务",
+    "calendar-schedule.text_e153d8f992": "群聊名单无效。",
+    "calendar-schedule.text_e3bc6225fb": "[{value1}] 时间：{cron} 任务：{value3}",
+    "calendar-schedule.text_e669edb409": "已添加：{id}",
+    "calendar-schedule.text_e9905d6bf8": "星铁日历",
+    "calendar-schedule.text_f3ad512a40": "原神日历",
+    "calendar-schedule.text_ff959e20bb": "日历任务已达上限。",
+    "calendar.text_15366813eb": "以下为上次读取的公告。",
+    "calendar.text_6a99c28ec2": "整图超过当前会话的图片上限",
+    "calendar.text_835321763a": "（按月轮换）",
+    "calendar.text_8727f227e2": " 至 ",
+    "calendar.text_8f85ada55f": "当前日期范围暂无活动公告。",
+    "calendar.text_9c5b0506c1": "日历列表",
+    "calendar.text_a00f295cfb": "日历",
+    "calendar.text_a19016013b": "公告详情暂不可用。",
+    "calendar.text_a2927891f0": "星铁",
+    "calendar.text_b1110352c9": "绝区零",
+    "calendar.text_b7eb5fa21a": "另有 {value1} 项活动。",
+    "calendar.text_c7936e0507": " 起长期有效",
+    "calendar.text_d1597c51ed": "原神",
+    "calendar.text_d694fb6a44": "暂时无法读取{label}官方活动公告，请稍后再试。",
+    "calendar.text_ed692ab927": "暂时无法生成图片",
+    "genshin-calendar-theme.text_0008bef9ff": "天光",
+    "genshin-calendar-theme.text_0b829e82db": "风雅",
+    "genshin-calendar-theme.text_0b93dbd19e": "稻妻",
+    "genshin-calendar-theme.text_1ddaa4cb37": "正义",
+    "genshin-calendar-theme.text_26e4c50e4b": "诤言",
+    "genshin-calendar-theme.text_2fbb66d6ed": "巧思",
+    "genshin-calendar-theme.text_336ccda3a4": "笃行",
+    "genshin-calendar-theme.text_33c4b04477": "月光",
+    "genshin-calendar-theme.text_34ba55ee06": "乐园",
+    "genshin-calendar-theme.text_36ea39c9aa": "浮世",
+    "genshin-calendar-theme.text_3e929dfa54": "挪德卡莱",
+    "genshin-calendar-theme.text_488a37f68b": "至冬",
+    "genshin-calendar-theme.text_5af16a87ad": "荣光",
+    "genshin-calendar-theme.text_5cc3c16a14": "慈爱",
+    "genshin-calendar-theme.text_68335fcf17": "须弥",
+    "genshin-calendar-theme.text_6b557bf926": "蒙德",
+    "genshin-calendar-theme.text_79f4146091": "焚燔",
+    "genshin-calendar-theme.text_81dcb34d9e": "勤劳",
+    "genshin-calendar-theme.text_87bb71140b": "坚忍",
+    "genshin-calendar-theme.text_8c78af3e64": "璃月",
+    "genshin-calendar-theme.text_9786bee8c7": "角逐",
+    "genshin-calendar-theme.text_979954d006": "纳塔",
+    "genshin-calendar-theme.text_988ca3fd4e": "纷争",
+    "genshin-calendar-theme.text_989e7d532a": "「{name}」的哲学",
+    "genshin-calendar-theme.text_adbda297b3": "浪迹",
+    "genshin-calendar-theme.text_b0016d937e": "抗争",
+    "genshin-calendar-theme.text_b28c4dbf42": "繁荣",
+    "genshin-calendar-theme.text_bbb72f61f1": "黄金",
+    "genshin-calendar-theme.text_bcefdeff3f": "公平",
+    "genshin-calendar-theme.text_c2c1845c3b": "秩序",
+    "genshin-calendar-theme.text_d1047eed5d": "自由",
+    "genshin-calendar-theme.text_d4d2194cd7": "诗文",
+    "genshin-calendar-theme.text_e8ac469478": "枫丹",
+    "genshin-strategy.text_26fbb37d49": "婧枫赛赛",
+    "genshin-strategy.text_3f1ba7ca9c": "西风驿站",
+    "genshin-strategy.text_4595e76ae5": "机器人主人可用 #设置默认攻略1 设置仅在普通攻略没有图时使用的来源。",
+    "genshin-strategy.text_4fc06b71e5": "发送 #心海攻略4 指定来源，或用 #更新早柚攻略4 刷新该来源。",
+    "genshin-strategy.text_9496d42dc8": "派蒙喵喵屋",
+    "genshin-strategy.text_a6eaba6ac9": "OH是姜姜呀",
+    "genshin-strategy.text_b4c6adf776": "曉K",
+    "genshin-strategy.text_c1c0189bc9": "原神观测枢",
+    "genshin-strategy.text_d6e1ae7557": "原神编号攻略",
+    "genshin-strategy.text_e16b588498": "原神攻略设置",
+    "genshin-strategy.text_fe561c5a71": "坤易",
+    "genshin-wish-countdown.text_27432ad48a": "卡池时段已变化，请重新查询。",
+    "genshin-wish-countdown.text_41c687c05b": "原神当前卡池（国服）\n",
+    "genshin-wish-countdown.text_74f54f95a5": "暂无法从国服官方公告核验当前卡池时间，请稍后重试。",
+    "genshin-wish-countdown.text_c4a7d5858b": "\n卡池剩余时间：{value1}天\n",
+    "guide-configuration.text_bb5e06e280": "攻略配置须为 YAML 映射。",
+    "index.text_07354106bb": "[guides] 定时日历 {stage} {value2}。",
+    "index.text_0cec41db02": "配队资源下载失败，请稍后重试。",
+    "index.text_1c3148c59f": "配队资源已更新。",
+    "index.text_28384d7afd": "失败",
+    "index.text_2fac30c3f5": "[guides] {label}尚未初始化，请运行 bun run bootstrap。",
+    "index.text_3537c723cd": "只有主人可以更新攻略资源。",
+    "index.text_3a27919142": "请发送 #强制更新攻略资源。",
+    "index.text_4219a7449e": "已是最新",
+    "index.text_434203a723": "已更新",
+    "index.text_446cfb7df8": "请发送 #更新攻略资源。",
+    "index.text_57f45d3948": "角色和进阶攻略资源",
+    "index.text_5c071b4dbc": "配队资源",
+    "index.text_628881681e": "角色和进阶攻略",
+    "index.text_6660325f0e": "[guides] {label}已更新。",
+    "index.text_6a2cf17295": "复刻表",
+    "index.text_6f4fe1ddfe": "配队资源更新失败，仍使用已有资源。",
+    "index.text_79989e841c": "结果待核对",
+    "index.text_7dfba262c5": "配队资源已是最新。",
+    "index.text_8e27ae72b0": "[guides] {label}更新失败，保留已有资源。",
+    "index.text_960d054046": "当前使用指定的配队资源目录。",
+    "index.text_987fe894f9": "请发送 #更新配队资源。",
+    "index.text_a1a5c68299": "正在检查角色、配队、复刻表和深渊参考资源。",
+    "index.text_c3fe07a2c1": "当前没有可更新的攻略资源。",
+    "index.text_d04679c243": "{label}：更新失败，保留本地资源",
+    "index.text_d3d18d8ca9": "只有主人可以更新配队资源。",
+    "index.text_d5f66a746a": "深渊参考图资源",
+    "index.text_eca52768cf": "请发送 #强制更新配队资源。",
+    "index.text_edc455e048": "深渊参考图",
+    "index.text_f24fbb17da": "复刻表资源",
+    "original-role-resources.text_0a2b0a7356": "角色攻略",
+    "original-role-resources.text_10b737a56b": "已取得 {path}",
+    "original-role-resources.text_1d0e07c58a": "核对并补全文件",
+    "original-role-resources.text_29fb3d2962": "文件已校验并准备",
+    "original-role-resources.text_32890d638f": "准备资源",
+    "original-role-resources.text_33382d5eff": "资源准备失败",
+    "original-role-resources.text_3499bdb4ca": "资源准备已中止",
+    "original-role-resources.text_4c7cd8de48": "角色原资源文件格式无效。",
+    "original-role-resources.text_4ddf8fc21c": "角色原资源",
+    "original-role-resources.text_6a2cf17295": "复刻表",
+    "original-role-resources.text_6a55cbc95d": "角色原图不完整。",
+    "original-role-resources.text_758e0dd70a": "下载本批缺失文件（{length} 项）",
+    "original-role-resources.text_847e9347b9": "扫描本地缓存",
+    "original-role-resources.text_a9101e1619": "保存资源",
+    "original-role-resources.text_c896e8908c": "攻略原资源清单不完整。",
+    "original-role-resources.text_e2c92c5671": "深渊参考",
+    "role-guide-collections.text_31d2de45f5": "攻略合集格式无效。",
+    "role-guide-collections.text_4526e13f15": "原攻略合集内容不可用。",
+    "role-guide-collections.text_69f08d4450": "原攻略来源无响应。",
+    "role-guide-collections.text_845ce94051": "攻略合集编号无效。",
+    "role-guide-collections.text_b4ad6e6045": "原攻略来源响应超限。",
+    "role-guide-collections.text_ddc1f23c7f": "攻略作者格式无效。",
+    "role-guide-input.text_2c91d48dd0": "{name}主攻略",
+    "role-guide-input.text_67139deb3a": "{name}攻略",
+    "role-guide-input.text_a2927891f0": "星铁",
+    "role-guide-input.text_b1110352c9": "绝区零",
+    "role-guide-input.text_cc21baabe2": "请选择{input}攻略：{value2}",
+    "role-guide-input.text_d1597c51ed": "原神",
+    "role-guides.text_1acdcd6272": "新艾利都快讯",
+    "role-guides.text_254303838f": "保存默认攻略来源失败，请稍后再试。",
+    "role-guides.text_2e8f813ad5": "只有主人可以设置默认攻略。",
+    "role-guides.text_353dfeb909": "已设置默认攻略来源 {source}（{value2}）。",
+    "role-guides.text_359a3bde90": "请发送 #设置默认攻略1 至 #设置默认攻略7。",
+    "role-guides.text_58b8b6d917": "暂无{name}攻略（{source}）。可发送 #攻略帮助 查看其他来源。",
+    "role-guides.text_8b7f0ff356": "暂时无法取得{name}的{label}攻略。",
+    "role-guides.text_924f484f0d": "听语惊花",
+    "role-guides.text_b783a829fe": "暂无{name}的{label}攻略。",
+    "role-guides.text_d2f920b643": "攻略~",
+    "role-guides.text_ef000bdafe": "原神攻略来源编号无效。请发送 #攻略帮助 查看来源。",
+    "role-materials.text_1e977905d7": "暂无{name}的原素材图，可用角色图鉴查看养成材料。",
+    "role-materials.text_52970d1efb": "暂无主角素材。",
+    "role-materials.text_6101723621": "{name}的素材图超过当前会话的单图大小上限。",
+    "role-references.text_0debbb8962": "暂无{name}进阶参考捏",
+    "role-references.text_39c688b722": "参考面板",
+    "role-references.text_414700cbe8": "【蓝佬小课堂】：\n{brief}",
+    "role-references.text_5299d26cf1": "角色默认配置：五星0命，四星满命，天赋满级",
+    "role-references.text_5ee099fc3e": "*历史希儿参考面板 可查旧版原图，*参考面板帮助 可查看图例。",
+    "role-references.text_7cc599b706": "星铁{value1}（旧版历史资料）",
+    "role-references.text_8e1a0b634e": "进阶参考",
+    "role-references.text_8e348c1b50": "曲线详细帮助：\n收益曲线说明书：https://www.miyoushe.com/ys/article/28119112\n《属性收益论》：https://www.miyoushe.com/ys/article/34217426\n《属性收益论》附录：https://www.miyoushe.com/ys/article/35015246",
+    "role-references.text_91a4a78b0f": "{name}进阶参考 @blue菌hehe",
+    "role-references.text_9c1ee39a9e": "圣遗物思路推荐：\n主词条：{mainProp}\n副词条：{viceProp}",
+    "role-references.text_a3383e5295": "*希儿面板 可查自己的角色面板。",
+    "role-references.text_a57cfcb842": "帮助",
+    "role-references.text_a87ab2d5e8": "暂无{name}的旧版历史参考面板。",
+    "role-references.text_c4646054ea": "*希儿参考面板 或 *罗刹参考面板 可查角色配装参考。",
+    "role-references.text_c93d0b7917": "{name}参考面板",
+    "role-references.text_d93a766b5f": "参考面板图例",
+    "role-resource-pack.text_0a2b0a7356": "角色攻略",
+    "role-resource-pack.text_514dc15847": "角色攻略原图总大小超限。",
+    "role-resource-pack.text_5cb9266475": "角色攻略资源不完整。",
+    "role-resource-pack.text_6d9c147313": "角色攻略资源大小无效。",
+    "role-resource-pack.text_a049a431c8": "角色攻略来源数超限。",
+    "role-resource-pack.text_ac90b6e095": "角色攻略原图格式无效。",
+    "role-resource-pack.text_bd8b9e8992": "[guides] 角色攻略资源无法刷新，保留已有原图。",
+    "starrail-guide-history.text_015575afbb": "白露、火主、娜塔莎、杰帕德",
+    "starrail-guide-history.text_052cbb4f6d": "输出 T0–T1",
+    "starrail-guide-history.text_084b42f6e9": "二",
+    "starrail-guide-history.text_0bbea1c6c9": "角色总表",
+    "starrail-guide-history.text_16ad572213": "火主、杰帕德、娜塔莎、白露",
+    "starrail-guide-history.text_18277dfbb0": "银狼、布洛妮娅、艾丝妲、停云",
+    "starrail-guide-history.text_1944622d87": "停云、银狼、佩拉、瓦尔特",
+    "starrail-guide-history.text_1b0542878c": "七",
+    "starrail-guide-history.text_2164d91c5e": "银狼、佩拉、停云、瓦尔特",
+    "starrail-guide-history.text_26d83cf78b": "星铁商店光锥推荐（历史资料）",
+    "starrail-guide-history.text_2c467d3673": "八",
+    "starrail-guide-history.text_2c937289ca": "艾丝妲、停云、银狼",
+    "starrail-guide-history.text_3401df6359": "上半",
+    "starrail-guide-history.text_37763bb640": "其{value1}",
+    "starrail-guide-history.text_38866b106e": "下半",
+    "starrail-guide-history.text_40d33aa115": "辅助",
+    "starrail-guide-history.text_4262c45dc7": "说明",
+    "starrail-guide-history.text_44835ec157": "白露、娜塔莎、火主、杰帕德",
+    "starrail-guide-history.text_4773bfcc50": "娜塔莎、火主、杰帕德、白露",
+    "starrail-guide-history.text_4f4b485b38": "银狼、艾丝妲、停云",
+    "starrail-guide-history.text_51a75f4634": "一",
+    "starrail-guide-history.text_52ca2629f6": "输出榜T0-1",
+    "starrail-guide-history.text_5a25c33b0d": "杰帕德、火主、三月七、娜塔莎、白露",
+    "starrail-guide-history.text_6396cef5e4": "艾丝妲、银狼、布洛妮娅、停云",
+    "starrail-guide-history.text_754a9d5828": "四",
+    "starrail-guide-history.text_7fa795b122": "输出 T2",
+    "starrail-guide-history.text_7ff6a19b83": "输出 T3",
+    "starrail-guide-history.text_80aa9405b7": "{title}的原图暂不可用。",
+    "starrail-guide-history.text_821a110caf": "星铁收益曲线（历史资料）",
+    "starrail-guide-history.text_8fc7625790": "{heading}\n输出 {value2}\n辅助 {value3}\n生存 {value4}",
+    "starrail-guide-history.text_9e1c20e8f2": "杰帕德、娜塔莎、白露、三月七",
+    "starrail-guide-history.text_9e7526cf5b": "杰帕德、白露、火主、娜塔莎",
+    "starrail-guide-history.text_a1a89b8459": "停云、银狼、艾丝妲、布洛妮娅、瓦尔特",
+    "starrail-guide-history.text_a2dfe01ee8": "火主、娜塔莎、白露",
+    "starrail-guide-history.text_a4c3313deb": "三",
+    "starrail-guide-history.text_a827ea1dc2": "杰帕德、娜塔莎、三月七、白露",
+    "starrail-guide-history.text_b013b7b31c": "艾丝妲、银狼、停云",
+    "starrail-guide-history.text_b44911ba80": "星铁 1.0 全角色强度榜（历史资料）",
+    "starrail-guide-history.text_b602333661": "火主、白露、杰帕德、娜塔莎",
+    "starrail-guide-history.text_c209c8bda2": "娜塔莎、白露、杰帕德、火主",
+    "starrail-guide-history.text_c6fdd30a01": "杰帕德、白露、娜塔莎、火主",
+    "starrail-guide-history.text_c7a27e01cb": "杰帕德、白露、娜塔莎、三月七",
+    "starrail-guide-history.text_c9b87f516a": "五",
+    "starrail-guide-history.text_cbd9667c3f": "生存",
+    "starrail-guide-history.text_cc8be31709": "艾丝妲、银狼、瓦尔特、佩拉",
+    "starrail-guide-history.text_d19403eb2a": "星铁 1.1 下半全角色攻略（历史资料）",
+    "starrail-guide-history.text_d890759bab": "佩拉、银狼、瓦尔特、停云",
+    "starrail-guide-history.text_d9133c032b": "娜塔莎、火主、白露、杰帕德",
+    "starrail-guide-history.text_daede98817": "备注",
+    "starrail-guide-history.text_db058ae4b6": "银狼、瓦尔特、布洛妮娅",
+    "starrail-guide-history.text_de07b53838": "六",
+    "starrail-guide-history.text_df897da6e0": "九",
+    "starrail-guide-history.text_e0b3c3410b": "输出榜T2",
+    "starrail-guide-history.text_e0d7f93059": "忘却之庭",
+    "starrail-guide-history.text_ee017a9f9a": "星铁忘却之庭 1.0 攻略（历史资料）",
+    "starrail-guide-history.text_f073298294": "输出榜T3",
+    "starrail-guide-history.text_f08558a444": "停云、银狼、瓦尔特、佩拉",
+    "starrail-guide-history.text_f0dbe3b58b": "白露、杰帕德、娜塔莎",
+    "starrail-guide-history.text_f1963413c6": "商店光锥推荐",
+    "starrail-guide-history.text_f7fd5247bf": "银狼、艾丝妲、布洛妮娅、瓦尔特、停云",
+    "starrail-guide-history.text_f85148a9ad": "生存榜",
+    "starrail-guide-history.text_f85e1d1e2c": "银狼、艾丝妲、瓦尔特、停云",
+    "starrail-guide-history.text_fc7edd399a": "十",
+    "starrail-guide-history.text_fdacb66105": "原图暂缺 {value1}。",
+    "starrail-strategy.text_082c97e645": "只有主人可以设置星铁默认攻略。",
+    "starrail-strategy.text_0d3bc5965f": "初始镜像",
+    "starrail-strategy.text_14335c16a9": "为全部旧编号来源",
+    "starrail-strategy.text_19a4b2724d": "来源 {value}（{source}）",
+    "starrail-strategy.text_1c3982a08a": "*希儿攻略0 和 *希儿攻略all 均查询三个旧编号来源。图文版本以原作者发布为准。",
+    "starrail-strategy.text_21c2c12838": "星穹中心",
+    "starrail-strategy.text_2fa06444ff": "星铁攻略设置",
+    "starrail-strategy.text_33f46d3479": "星铁编号攻略",
+    "starrail-strategy.text_3702fbbed2": "*希儿攻略2 或 *更新希儿攻略2 可查询或刷新指定作者的原图。",
+    "starrail-strategy.text_38d72b38b9": "开拓者·同谐",
+    "starrail-strategy.text_3c35fa62e2": "了解角色一图流及其他命令 https://www.lotusshared.cn/yunzai/",
+    "starrail-strategy.text_454d08bcaf": "已设置星铁默认攻略{value1}。",
+    "starrail-strategy.text_474aeb4317": "开拓者·欢愉",
+    "starrail-strategy.text_78cc00bb61": "{displayName}旧编号攻略",
+    "starrail-strategy.text_79ee0edc7e": "0 · 全部旧编号来源",
+    "starrail-strategy.text_7a393835c0": "暂无{value1}的原图。",
+    "starrail-strategy.text_8176f01698": "小橙子阿",
+    "starrail-strategy.text_877e966392": "开拓者·存护",
+    "starrail-strategy.text_88721e6ca7": "旧编号 {number} · {source} · {displayName}攻略",
+    "starrail-strategy.text_8c62b9ec0e": "开拓者·记忆",
+    "starrail-strategy.text_91855e03f8": "暂无{displayName}攻略（{value2}）。请发送 *攻略帮助 查看来源。",
+    "starrail-strategy.text_9680e7c3f3": "开拓者·毁灭",
+    "starrail-strategy.text_a00f8bd07b": "星铁攻略编号须为 0 至 3。请发送 *攻略帮助 查看来源。",
+    "starrail-strategy.text_aacffbe8c8": "旧编号来源",
+    "starrail-strategy.text_ab047ac488": "机器人主人可用 *设置默认攻略0 至 *设置默认攻略3 切换默认来源。",
+    "starrail-strategy.text_d07b0469e6": "保存星铁默认攻略失败，请稍后再试。",
+    "starrail-strategy.text_eba6074f12": "请发送 *设置默认攻略0 至 *设置默认攻略3，0 表示全部旧编号来源。",
+    "starrail-strategy.text_f58cf6cec8": "现行角色攻略",
+    "team-guides.text_06d1ffa3d8": "无效的配队索引。",
+    "team-guides.text_2511a2f3b2": "{query}配队详情",
+    "team-guides.text_380ec1b133": "{name}配队",
+    "team-guides.text_55c213041f": "请选择{query}配队：{value2}",
+    "team-guides.text_960c0db897": "没找到对应的配队图片，请检查原资源包是否完整。",
+    "team-guides.text_98ff4363f1": "原神配队资源不可用。请检查配队资源目录和 teamGuides.yaml。",
+    "team-guides.text_9e0281de7e": "读取期间配队资源发生变化。",
+    "team-guides.text_af431e2651": "配队资源路径已超出目录。",
+    "team-guides.text_b992115dc4": "暂无{query}配队捏",
+    "team-guides.text_f43c76d869": "无效的配队资源文件。",
+    "team-resources.text_008a2bcfa0": "上游配队目录无效。",
+    "team-resources.text_1cb4236449": "已取得 {file}",
+    "team-resources.text_25b8e529c1": "上游配队文件不完整。",
+    "team-resources.text_28c904aa11": "配队资源路径无效。",
+    "team-resources.text_33382d5eff": "资源准备失败",
+    "team-resources.text_3499bdb4ca": "资源准备已中止",
+    "team-resources.text_5c071b4dbc": "配队资源",
+    "team-resources.text_649ed49a72": "核对配队缓存",
+    "team-resources.text_67ecea62ab": "下载配队资源",
+    "team-resources.text_6a9582f87c": "上游配队文件大小无效。",
+    "team-resources.text_859a05c1f5": "保存配队资源",
+    "team-resources.text_8fedba8901": "上游缺少可用的配队索引。",
+    "team-resources.text_928d88596e": "同步上游攻略资源索引",
+    "team-resources.text_a8f780ca19": "核对攻略快照",
+    "team-resources.text_a9ec0cb77b": "无法读取上游攻略资源（Git {command}）。",
+    "team-resources.text_b4d89c0fa0": "配队资源清单无效。",
+    "team-resources.text_ba4fe507fe": "配队缓存核对完成",
+    "team-resources.text_c1fe835528": "配队资源须为原仓库的普通文件。",
+    "team-resources.text_e5c15ba654": "配队资源 Git 协议不受支持。",
+    "team-resources.text_ebd17512d3": "下载攻略资源需要 Git。",
+    "team-resources.text_ed68fea769": "上游配队索引缺少原图。",
+    "team-resources.text_ed6e9d1788": "准备配队资源",
+    "zzz-official-calendar.text_0c867c717c": "未找到活动日历图片",
+    "zzz-official-calendar.text_2d75141731": "暂时无法刷新，以下为上次取得的官方活动日历。",
+    "zzz-official-calendar.text_3298c8161e": "当前会话无法发送这张官方原图，请打开原图链接。\n{url}",
+    "zzz-official-calendar.text_368d5a68ac": "日历原图格式无效。",
+    "zzz-official-calendar.text_3d3b06be2c": "未找到活动日历",
+    "zzz-official-calendar.text_6d83e69ba0": "获取活动日历图片失败，请稍后再试。",
+    "zzz-official-calendar.text_8d35469515": "获取活动日历失败，请稍后再试。",
+    "zzz-official-calendar.text_e56348c422": "获取活动列表失败",
+    "zzz-strategy.text_1492f10d0c": "主人可用 %设置默认攻略2 或 %设置默认攻略all，以及 %设置所有攻略显示个数4。",
+    "zzz-strategy.text_16af525009": "暂无{name}攻略（{source}）。",
+    "zzz-strategy.text_1acdcd6272": "新艾利都快讯",
+    "zzz-strategy.text_20005a38e7": "只有主人可以设置绝区零攻略来源。",
+    "zzz-strategy.text_2484f5af4d": "保存绝区零攻略设置失败，请稍后再试。",
+    "zzz-strategy.text_3accd00fae": "已设置绝区零默认攻略来源{value1}。",
+    "zzz-strategy.text_5387cf83b1": "绝区零编号攻略",
+    "zzz-strategy.text_5c3e532279": "绝区零攻略设置",
+    "zzz-strategy.text_5fe2e46ce8": "用 %艾莲攻略2 选择来源，用 %艾莲攻略all 查看多个来源。要重新取图，可发送 %更新艾莲攻略2。",
+    "zzz-strategy.text_62c74e680e": "为全部",
+    "zzz-strategy.text_64f2ef0e1b": "所有攻略显示个数须为 1–7。",
+    "zzz-strategy.text_8176f01698": "小橙子阿",
+    "zzz-strategy.text_9f357adb61": "全部来源",
+    "zzz-strategy.text_a647fad4b7": "HoYo青枫",
+    "zzz-strategy.text_a7e9bb4364": "月光中心",
+    "zzz-strategy.text_adc4aaf292": "猫冬",
+    "zzz-strategy.text_b4fa8f0b66": "苦雪的清心花凉糕Suki",
+    "zzz-strategy.text_b86b8f6f77": "清茶沐沐Kiyotya",
+    "zzz-strategy.text_ddd4370c0d": "已设置绝区零所有攻略显示个数为 {selected}。",
+    "zzz-strategy.text_e995d5a8a5": "攻略编号超出范围。请发送 %攻略帮助 查看来源。",
+    "zzz-strategy.text_f1ade3a6a7": "请选择攻略编号 0–7 或 all。"
+  },
+  "parameters": {
+    "abyss-references.text_b27a2737eb": {
+      "version": "version"
+    },
+    "abyss-references.text_c5e13f74d7": {
+      "value1": "missing.map(file => basename(file, \".jpg\")).join(\"、\")"
+    },
+    "abyss-references.text_12277d820b": {
+      "version": "version"
+    },
+    "akasha-abyss.text_b8adf97467": {
+      "version": "source.version"
+    },
+    "akasha-abyss.text_57d32b4df7": {
+      "date": "source.date"
+    },
+    "akasha-abyss.text_7ada4813e5": {
+      "lead": "lead"
+    },
+    "akasha-abyss.text_8a56c6ab9d": {
+      "rarity": "query.rarity"
+    },
+    "akasha-abyss.text_ac623ce2f3": {
+      "lead": "lead",
+      "page": "query.page"
+    },
+    "akasha-abyss.text_838ac0ba92": {
+      "half": "query.half",
+      "sort": "query.sort"
+    },
+    "akasha-abyss.text_85032a4f47": {
+      "value1": "row.names.join(\"、\")",
+      "count": "row.count",
+      "value3": "row.full.toFixed(2)",
+      "ratio": "row.ratio"
+    },
+    "akasha-abyss.text_54595f6d35": {
+      "page": "card.page",
+      "pageCount": "card.pageCount"
+    },
+    "akasha-card.text_472afe95aa": {
+      "page": "card.page",
+      "pageCount": "card.pageCount"
+    },
+    "banner-tables.text_d0f7ae914c": {
+      "value1": "missing.map(file => file.slice(\"Banners/\".length, -4)).join(\"、\")"
+    },
+    "calendar-card.text_b4baa30d48": {
+      "value1": "Math.round(milliseconds / day)"
+    },
+    "calendar-card.text_f512482fac": {
+      "value1": "Math.floor(milliseconds / 3_600_000)"
+    },
+    "calendar-card.text_1bd5b8aea7": {
+      "value1": "Math.max(1, Math.floor(milliseconds / 60_000))"
+    },
+    "calendar-card.text_76fed77dc3": {
+      "value1": "time(row.start)"
+    },
+    "calendar-card.text_d38262246e": {
+      "value1": "time(row.end)"
+    },
+    "calendar-card.text_32f584bc7c": {
+      "value1": "time(row.earliestEnd)",
+      "value2": "time(row.end)"
+    },
+    "calendar-card.text_26f9f67809": {
+      "value1": "showStart ? start + \" ~ \" : \"\"",
+      "end": "end"
+    },
+    "calendar-card.text_16b0a042a3": {
+      "start": "start",
+      "value2": "relative(row.start - now)"
+    },
+    "calendar-card.text_92a75f517c": {
+      "value1": "showStart ? start + \" ~ \" : \"\"",
+      "end": "end",
+      "value3": "relative(row.end - now)"
+    },
+    "calendar-card.text_fa4962f757": {
+      "value1": "cell.getUTCMonth() + 1"
+    },
+    "calendar-card.text_e6ad509939": {
+      "value1": "cell.getUTCDate()"
+    },
+    "calendar-card.text_4f0d66e2e2": {
+      "value1": "weekdays[cell.getUTCDay()]"
+    },
+    "calendar-card.text_d63c6143d3": {
+      "value1": "time(data.now, true)"
+    },
+    "calendar-card.text_ffe1c0506d": {
+      "value1": "time(data.updated, true)"
+    },
+    "calendar-schedule.text_c969a31cec": {
+      "value1": "current.whiteList.join(\", \") || \"无\"",
+      "value2": "current.blackList.join(\", \") || \"无\""
+    },
+    "calendar-schedule.text_e3bc6225fb": {
+      "value1": "index + 1",
+      "cron": "cron",
+      "value3": "labels[type]"
+    },
+    "calendar-schedule.text_4b4ca7e1eb": {
+      "cron": "entry.cron",
+      "value2": "labels[entry.type]"
+    },
+    "calendar-schedule.text_e669edb409": {
+      "id": "id"
+    },
+    "calendar-schedule.text_b96173785e": {
+      "id": "id"
+    },
+    "calendar.text_b7eb5fa21a": {
+      "value1": "table.rows.length - lines.length"
+    },
+    "calendar.text_d694fb6a44": {
+      "label": "config.label"
+    },
+    "genshin-calendar-theme.text_989e7d532a": {
+      "name": "name"
+    },
+    "genshin-wish-countdown.text_c4a7d5858b": {
+      "value1": "Math.ceil((deadline - completed) / day)"
+    },
+    "index.text_d04679c243": {
+      "label": "source.label"
+    },
+    "index.text_6660325f0e": {
+      "label": "label"
+    },
+    "index.text_8e27ae72b0": {
+      "label": "label"
+    },
+    "index.text_2fac30c3f5": {
+      "label": "label"
+    },
+    "index.text_07354106bb": {
+      "stage": "stage",
+      "value2": "outcome === \"unknown\" ? \"结果待核对\" : \"失败\""
+    },
+    "original-role-resources.text_758e0dd70a": {
+      "length": "missing.length"
+    },
+    "original-role-resources.text_10b737a56b": {
+      "path": "item.path"
+    },
+    "role-guide-input.text_67139deb3a": {
+      "name": "name"
+    },
+    "role-guide-input.text_cc21baabe2": {
+      "input": "input",
+      "value2": "trailblazers.map(([name]) => `${name}主攻略`).join(\"、\")"
+    },
+    "role-guide-input.text_2c91d48dd0": {
+      "name": "name"
+    },
+    "role-guides.text_58b8b6d917": {
+      "name": "role.name",
+      "source": "author.source"
+    },
+    "role-guides.text_b783a829fe": {
+      "name": "role.name",
+      "label": "gamePath.label"
+    },
+    "role-guides.text_353dfeb909": {
+      "source": "source",
+      "value2": "genshinStrategySource(source)!.source"
+    },
+    "role-guides.text_8b7f0ff356": {
+      "name": "role.name",
+      "label": "guideGames[game].label"
+    },
+    "role-materials.text_1e977905d7": {
+      "name": "role.name"
+    },
+    "role-materials.text_6101723621": {
+      "name": "role.name"
+    },
+    "role-references.text_9c1ee39a9e": {
+      "mainProp": "info.mainProp",
+      "viceProp": "info.viceProp"
+    },
+    "role-references.text_414700cbe8": {
+      "brief": "info.brief"
+    },
+    "role-references.text_c93d0b7917": {
+      "name": "name"
+    },
+    "role-references.text_7cc599b706": {
+      "value1": "name === undefined ? \"参考面板图例\" : `${name}参考面板`"
+    },
+    "role-references.text_0debbb8962": {
+      "name": "name"
+    },
+    "role-references.text_91a4a78b0f": {
+      "name": "name"
+    },
+    "role-references.text_a87ab2d5e8": {
+      "name": "role.name"
+    },
+    "starrail-guide-history.text_37763bb640": {
+      "value1": "floorNumbers[Math.floor((index - 1) / 3)]"
+    },
+    "starrail-guide-history.text_8fc7625790": {
+      "heading": "heading",
+      "value2": "recommendation[0]",
+      "value3": "recommendation[1]",
+      "value4": "recommendation[2]"
+    },
+    "starrail-guide-history.text_80aa9405b7": {
+      "title": "title"
+    },
+    "starrail-guide-history.text_fdacb66105": {
+      "value1": "missing.join(\"、\")"
+    },
+    "starrail-strategy.text_88721e6ca7": {
+      "number": "number",
+      "source": "author.source",
+      "displayName": "displayName"
+    },
+    "starrail-strategy.text_91855e03f8": {
+      "displayName": "displayName",
+      "value2": "source === 0 ? \"旧编号来源\" : sources[source - 1]!.source"
+    },
+    "starrail-strategy.text_7a393835c0": {
+      "value1": "missing.join(\"、\")"
+    },
+    "starrail-strategy.text_78cc00bb61": {
+      "displayName": "displayName"
+    },
+    "starrail-strategy.text_19a4b2724d": {
+      "value": "value",
+      "source": "sources[value - 1]!.source"
+    },
+    "starrail-strategy.text_454d08bcaf": {
+      "value1": "value === 0 ? \"为全部旧编号来源\" : `来源 ${value}（${sources[value - 1]!.source}）`"
+    },
+    "team-guides.text_380ec1b133": {
+      "name": "name"
+    },
+    "team-guides.text_55c213041f": {
+      "query": "query",
+      "value2": "travelerElements.map((name) => `${name}配队`).join(\"、\")"
+    },
+    "team-guides.text_b992115dc4": {
+      "query": "query"
+    },
+    "team-guides.text_2511a2f3b2": {
+      "query": "query"
+    },
+    "team-resources.text_a9ec0cb77b": {
+      "command": "command"
+    },
+    "team-resources.text_1cb4236449": {
+      "file": "file"
+    },
+    "zzz-official-calendar.text_3298c8161e": {
+      "url": "result.url"
+    },
+    "zzz-strategy.text_16af525009": {
+      "name": "name",
+      "source": "author.source"
+    },
+    "zzz-strategy.text_3accd00fae": {
+      "value1": "selected ? ` ${selected}（${sources[selected - 1]!.source}）` : \"为全部\""
+    },
+    "zzz-strategy.text_ddd4370c0d": {
+      "selected": "selected"
+    }
+  }
+}

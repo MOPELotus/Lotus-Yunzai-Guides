@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 // Reference panels and yield curves are from Mora-Plugin model/roleGuide.js.
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,13 +13,13 @@ import { guideKey, normalizeStarRailGuideCommand, resolveGuideRole, safeGuideNam
 import { createOriginalStarRailGuideReader } from "./starrail-guide-history.ts";
 
 const genshinHelp = [
-  "角色默认配置：五星0命，四星满命，天赋满级",
-  "曲线详细帮助：\n收益曲线说明书：https://www.miyoushe.com/ys/article/28119112\n《属性收益论》：https://www.miyoushe.com/ys/article/34217426\n《属性收益论》附录：https://www.miyoushe.com/ys/article/35015246",
+  $t("role-references.text_5299d26cf1"),
+  $t("role-references.text_8e348c1b50"),
 ];
 const starrailHelp = [
-  "*希儿参考面板 或 *罗刹参考面板 可查角色配装参考。",
-  "*历史希儿参考面板 可查旧版原图，*参考面板帮助 可查看图例。",
-  "*希儿面板 可查自己的角色面板。",
+  $t("role-references.text_c4646054ea"),
+  $t("role-references.text_5ee099fc3e"),
+  $t("role-references.text_a3383e5295"),
 ];
 
 // Exact filenames from the fixed independent plugin, with old aliases absent from the current role index.
@@ -65,8 +68,8 @@ function readNotes(bytes: Buffer | undefined, name: string) {
     const url = typeof notes.url === "string" && /^https:\/\/www\.miyoushe\.com\/(?:ys|sr)\/article\/\d+$/u.test(notes.url)
       ? notes.url : undefined;
     const arti = typeof info.mainProp === "string" && typeof info.viceProp === "string"
-      ? `圣遗物思路推荐：\n主词条：${info.mainProp}\n副词条：${info.viceProp}` : undefined;
-    const brief = typeof info.brief === "string" ? `【蓝佬小课堂】：\n${info.brief}` : undefined;
+      ? $t("role-references.text_9c1ee39a9e", { "mainProp": info.mainProp, "viceProp": info.viceProp }) : undefined;
+    const brief = typeof info.brief === "string" ? $t("role-references.text_414700cbe8", { "brief": info.brief }) : undefined;
     return { url, arti, brief };
   } catch {}
 }
@@ -95,11 +98,11 @@ export function createRoleReferences(options: {
     if (!file) return;
     const bytes = await original(file);
     if (options.signal?.aborted) return;
-    if (bytes) return [`星铁${name === undefined ? "参考面板图例" : `${name}参考面板`}（旧版历史资料）`, { type: "image", file: bytes }];
+    if (bytes) return [$t("role-references.text_7cc599b706", { "value1": name === undefined ? $t("role-references.text_d93a766b5f") : $t("role-references.text_c93d0b7917", { "name": name }) }), { type: "image", file: bytes }];
   }
 
   async function help(game: GuideGame): Promise<CommandReply> {
-    const files = await pack(game, "帮助", false);
+    const files = await pack(game, $t("role-references.text_a57cfcb842"), false);
     const text = game === "gs" ? genshinHelp : starrailHelp;
     if (!files.length) {
       if (game === "sr") {
@@ -122,7 +125,7 @@ export function createRoleReferences(options: {
         const archived = await historicalReference(name);
         if (archived !== undefined) return archived;
       }
-      return `暂无${name}进阶参考捏`;
+      return $t("role-references.text_0debbb8962", { "name": name });
     }
     const notes = readNotes(files.find((file) => file.source === referenceNotes)?.bytes, name);
     const heading = [first, ...(notes?.url ? [notes.url] : [])];
@@ -130,18 +133,18 @@ export function createRoleReferences(options: {
       heading, ...refs, ...(notes?.arti ? [notes.arti] : []), ...curves, ...(notes?.brief ? [notes.brief] : []),
     ];
     if (nodes.length === 1) return heading;
-    const title = `${name}进阶参考 @blue菌hehe`;
+    const title = $t("role-references.text_91a4a78b0f", { "name": name });
     if (options.forward !== false) return { type: "forward", nodes: [title, ...nodes] };
     return [title, ...heading, ...refs, ...(notes?.arti ? [notes.arti] : []), ...curves, ...(notes?.brief ? [notes.brief] : [])];
   }
 
   function resolveCurrent(game: GuideGame, query: string, onlyHistorical: boolean, useHistorical: boolean) {
     function answer(role: ReturnType<typeof resolveGuideRole>) {
-      if (typeof role === "string") return role.replaceAll("攻略", game === "sr" ? "参考面板" : "进阶参考");
+      if (typeof role === "string") return role.replaceAll("攻略", game === "sr" ? $t("role-references.text_39c688b722") : $t("role-references.text_8e1a0b634e"));
       if (role && safeGuideName(role.name)) {
         if (!onlyHistorical) return reference(game, role.name, useHistorical);
         return historicalReference(role.name).then(reply => reply ??
-          (options.signal?.aborted ? undefined : `暂无${role.name}的旧版历史参考面板。`));
+          (options.signal?.aborted ? undefined : $t("role-references.text_a87ab2d5e8", { "name": role.name })));
       }
     }
     const role = resolveGuideRole(query, game);

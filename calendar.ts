@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import { builtinResourceDirectory } from "../../lib/builtin-resources.ts";
 import { fileURLToPath } from "node:url";
 import type { CommandReply } from "../../lib/commands.ts";
@@ -8,9 +11,9 @@ import { genshinWishCountdown, matchesGenshinWishCountdown } from "./genshin-wis
 import type { CalendarScheduleKind } from "./calendar-schedule.ts";
 
 const games = {
-  starrail: { label: "星铁", rule: /^#星铁日历(列表)?$/u, theme: "LOTUS_STAR_RAIL_GACHA_THEME_DIR" },
-  genshin: { label: "原神", rule: /^#+日历(列表)?$/u, theme: "LOTUS_GENSHIN_GACHA_THEME_DIR" },
-  zzz: { label: "绝区零", rule: /^#绝区零日历(列表)?$/u, theme: "LOTUS_ZZZ_CALENDAR_THEME_DIR" },
+  starrail: { label: $t("calendar.text_a2927891f0"), rule: /^#星铁日历(列表)?$/u, theme: "LOTUS_STAR_RAIL_GACHA_THEME_DIR" },
+  genshin: { label: $t("calendar.text_d1597c51ed"), rule: /^#+日历(列表)?$/u, theme: "LOTUS_GENSHIN_GACHA_THEME_DIR" },
+  zzz: { label: $t("calendar.text_b1110352c9"), rule: /^#绝区零日历(列表)?$/u, theme: "LOTUS_ZZZ_CALENDAR_THEME_DIR" },
 } as const;
 
 type CalendarOptions = {
@@ -24,12 +27,12 @@ type CalendarReply = CalendarImage | string;
 
 function formatCalendarText(table: CalendarData, label: string, title: string, reason: string) {
   const date = (value: number) => new Date(value + 8 * 3_600_000).toISOString().slice(5, 16).replace("T", " ");
-  const heading = [`${label}${title} · ${reason}`, ...(table.stale ? ["以下为上次读取的公告。"] : []),
-    ...(!table.detailsAvailable ? ["公告详情暂不可用。"] : [])];
-  if (!table.rows.length) return [...heading, "当前日期范围暂无活动公告。"].join("\n");
+  const heading = [`${label}${title} · ${reason}`, ...(table.stale ? [$t("calendar.text_15366813eb")] : []),
+    ...(!table.detailsAvailable ? [$t("calendar.text_a19016013b")] : [])];
+  if (!table.rows.length) return [...heading, $t("calendar.text_8f85ada55f")].join("\n");
   const lines = table.rows.slice(0, 10).map(({ title, start, end, permanent, monthlyRotation }) =>
-    `${title.slice(0, 120)} · ${date(start)}${permanent ? " 起长期有效" : " 至 " + date(end)}${monthlyRotation ? "（按月轮换）" : ""}`);
-  if (table.rows.length > lines.length) lines.push(`另有 ${table.rows.length - lines.length} 项活动。`);
+    `${title.slice(0, 120)} · ${date(start)}${permanent ? $t("calendar.text_c7936e0507") : $t("calendar.text_8727f227e2") + date(end)}${monthlyRotation ? $t("calendar.text_835321763a") : ""}`);
+  if (table.rows.length > lines.length) lines.push($t("calendar.text_b7eb5fa21a", { "value1": table.rows.length - lines.length }));
   return [...heading, ...lines].join("\n");
 }
 
@@ -53,8 +56,8 @@ function createGameCalendar(game: CalendarGame, options: CalendarOptions = {}) {
       return { type: "image", file: png };
     } catch (error) {
       signal?.throwIfAborted();
-      const reason = error instanceof ImageSizeLimitError ? "整图超过当前会话的图片上限" : "暂时无法生成图片";
-      return formatCalendarText(table, config.label, list ? "日历列表" : "日历", reason);
+      const reason = error instanceof ImageSizeLimitError ? $t("calendar.text_6a99c28ec2") : $t("calendar.text_ed692ab927");
+      return formatCalendarText(table, config.label, list ? $t("calendar.text_9c5b0506c1") : $t("calendar.text_a00f295cfb"), reason);
     }
   }
 
@@ -63,7 +66,7 @@ function createGameCalendar(game: CalendarGame, options: CalendarOptions = {}) {
     const match = config.rule.exec(message.trim());
     if (!match) return;
     return render(Boolean(match[1]), inlineImageByteLimit).then(reply =>
-      reply ?? `暂时无法读取${config.label}官方活动公告，请稍后再试。`);
+      reply ?? $t("calendar.text_d694fb6a44", { "label": config.label }));
   }
   return { handle, render };
 }

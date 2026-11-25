@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import { createGuideResourcePreparation } from "./initialize-resources.ts";
 import type { ResourceProgressCallback } from "../../lib/resource-progress.ts";
 import { fileURLToPath } from "node:url";
@@ -41,29 +44,29 @@ export function createGuidesModule(options: {
 }): CommandModule {
   const { resources } = options;
   const refresh = (force: boolean) => async (argument: string, { isMaster }: { isMaster: boolean }) => {
-    if (!isMaster) return "只有主人可以更新配队资源。";
-    if (argument) return force ? "请发送 #强制更新配队资源。" : "请发送 #更新配队资源。";
-    if (!resources) return "当前使用指定的配队资源目录。";
+    if (!isMaster) return $t("index.text_d3d18d8ca9");
+    if (argument) return force ? $t("index.text_eca52768cf") : $t("index.text_987fe894f9");
+    if (!resources) return $t("index.text_960d054046");
     try {
       const state = await resources.refresh(force);
-      return state === "current" ? "配队资源已是最新。" : "配队资源已更新。";
+      return state === "current" ? $t("index.text_7dfba262c5") : $t("index.text_1c3148c59f");
     } catch {
-      return await resources.available() ? "配队资源更新失败，仍使用已有资源。" : "配队资源下载失败，请稍后重试。";
+      return await resources.available() ? $t("index.text_6f4fe1ddfe") : $t("index.text_0cec41db02");
     }
   };
   const refreshAll = async (force: boolean, argument: string, { isMaster, isDelegated, reply }:
     Pick<MessageEvent, "isMaster" | "isDelegated" | "reply">) => {
-    if (!isMaster || isDelegated) return "只有主人可以更新攻略资源。";
-    if (argument) return force ? "请发送 #强制更新攻略资源。" : "请发送 #更新攻略资源。";
+    if (!isMaster || isDelegated) return $t("index.text_3537c723cd");
+    if (argument) return force ? $t("index.text_3a27919142") : $t("index.text_446cfb7df8");
     const sources = options.refreshSources;
-    if (!sources?.length) return "当前没有可更新的攻略资源。";
-    try { await reply("正在检查角色、配队、复刻表和深渊参考资源。"); } catch {}
+    if (!sources?.length) return $t("index.text_c3fe07a2c1");
+    try { await reply($t("index.text_a1a5c68299")); } catch {}
     const results: string[] = [];
     for (const source of sources) {
       try {
-        results.push(`${source.label}：${await source.refresh(force) === "updated" ? "已更新" : "已是最新"}`);
+        results.push(`${source.label}：${await source.refresh(force) === "updated" ? $t("index.text_434203a723") : $t("index.text_4219a7449e")}`);
       } catch {
-        results.push(`${source.label}：更新失败，保留本地资源`);
+        results.push($t("index.text_d04679c243", { "label": source.label }));
       }
     }
     return results.join("\n");
@@ -102,7 +105,7 @@ export function createGuidesModule(options: {
 }
 
 export function startTeamResourceRefresh(resources: TeamResources, signal: AbortSignal) {
-  return startResourceRefresh(resources, signal, "team", "配队资源");
+  return startResourceRefresh(resources, signal, "team", $t("index.text_5c071b4dbc"));
 }
 
 function startResourceRefresh(resources: Pick<TeamResources, "refresh" | "initialized" | "wait">,
@@ -115,11 +118,11 @@ function startResourceRefresh(resources: Pick<TeamResources, "refresh" | "initia
     updating = true;
     if (retry) clearTimeout(retry);
     try {
-      if (await resources.refresh() === "updated") console.info(`[guides] ${label}已更新。`);
+      if (await resources.refresh() === "updated") console.info($t("index.text_6660325f0e", { "label": label }));
       delay = 60_000;
     } catch (error) {
       if (signal.aborted) return;
-      console.warn(`[guides] ${label}更新失败，保留已有资源。`, error instanceof Error ? error.message : "");
+      console.warn($t("index.text_8e27ae72b0", { "label": label }), error instanceof Error ? error.message : "");
       retry = setTimeout(() => { void update(); }, delay);
       retry.unref();
       delay = Math.min(delay * 2, 3_600_000);
@@ -133,7 +136,7 @@ function startResourceRefresh(resources: Pick<TeamResources, "refresh" | "initia
   if (!signal.aborted) {
     job.schedule({ rule: kind === "team" ? "0 0 2,14 * * *" : "0 0 5,17 * * *", tz: "Asia/Shanghai" });
     void resources.initialized().catch(() => false).then(ready => {
-      if (!ready && !signal.aborted) console.warn(`[guides] ${label}尚未初始化，请运行 bun run bootstrap。`);
+      if (!ready && !signal.aborted) console.warn($t("index.text_2fac30c3f5", { "label": label }));
     });
   }
   const stop = () => {
@@ -202,17 +205,17 @@ export async function createModule({ signal, lockFile, guidesSchedule, onProgres
   const genshinCalendar = createGenshinCalendar({ signal: refreshSignal });
   const zzzCalendar = createZzzCalendar({ signal: refreshSignal });
   const refreshSources = [
-    { label: "角色和进阶攻略", refresh: original.refresh },
-    ...(resources ? [{ label: "配队资源", refresh: resources.refresh }] : []),
-    { label: "复刻表", refresh: bannerResources.refresh },
-    { label: "深渊参考图", refresh: abyssResources.refresh },
+    { label: $t("index.text_628881681e"), refresh: original.refresh },
+    ...(resources ? [{ label: $t("index.text_5c071b4dbc"), refresh: resources.refresh }] : []),
+    { label: $t("index.text_6a2cf17295"), refresh: bannerResources.refresh },
+    { label: $t("index.text_edc455e048"), refresh: abyssResources.refresh },
   ];
   const scheduled = guidesSchedule && await createCalendarSchedule({
     signal: refreshSignal, root: installation, lockFile,
     register: guidesSchedule.registerTask, targets: guidesSchedule.targets,
     render: createScheduledCalendarRenderer({ signal: refreshSignal }),
     report(stage, outcome) {
-      console.warn(`[guides] 定时日历 ${stage} ${outcome === "unknown" ? "结果待核对" : "失败"}。`);
+      console.warn($t("index.text_07354106bb", { "stage": stage, "value2": outcome === "unknown" ? $t("index.text_79989e841c") : $t("index.text_28384d7afd") }));
     },
   });
   const unregister = scheduled && !refreshSignal.aborted ? guidesSchedule?.register(scheduled) : undefined;
@@ -223,9 +226,9 @@ export async function createModule({ signal, lockFile, guidesSchedule, onProgres
   const cancelStart = guideAutomatic && guidesSchedule?.whenReady(() => {
     if (refreshSignal.aborted) return;
     if (resources) stop = startTeamResourceRefresh(resources, refreshSignal);
-    stopOriginal = startResourceRefresh(original, refreshSignal, "role", "角色和进阶攻略资源");
-    stopBanners = startResourceRefresh(bannerResources, refreshSignal, "banners", "复刻表资源");
-    stopAbyss = startResourceRefresh(abyssResources, refreshSignal, "abyss-reference", "深渊参考图资源");
+    stopOriginal = startResourceRefresh(original, refreshSignal, "role", $t("index.text_57f45d3948"));
+    stopBanners = startResourceRefresh(bannerResources, refreshSignal, "banners", $t("index.text_f24fbb17da"));
+    stopAbyss = startResourceRefresh(abyssResources, refreshSignal, "abyss-reference", $t("index.text_d5f66a746a"));
   });
   return {
     ...createGuidesModule({ directory: directory ?? legacyDirectory, forward, resources, refreshSources, roleGuides, roleReferences, roleMaterials,

@@ -1,3 +1,6 @@
+import { createTranslator as createTextTranslator } from "../../packages/i18n/index.ts";
+import messageCatalog from "./i18n/zh-CN.json";
+const $t = createTextTranslator("guides", messageCatalog.messages);
 import { lstat, readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type { CommandReply } from "../../lib/commands.ts";
@@ -37,11 +40,11 @@ export function createAbyssReferences(resources: Pick<OriginalRoleResources, "cu
   let retryVersionAt = 0;
 
   async function versionHistory(version: string): Promise<CommandReply | undefined> {
-    const title = `原神${version}深渊`;
+    const title = $t("abyss-references.text_b27a2737eb", { "version": version });
     if (version === "1.0") {
       const { images, missing } = await find(opening);
       if (!images.length) return;
-      if (missing.length) return [title, `原图暂缺${missing.map(file => basename(file)).join("、")}。`, ...images];
+      if (missing.length) return [title, $t("abyss-references.text_c5e13f74d7", { "value1": missing.map(file => basename(file)).join("、") }), ...images];
       const nodes = [title, ...images];
       return forward ? { type: "forward", nodes } : nodes;
     }
@@ -82,10 +85,10 @@ export function createAbyssReferences(resources: Pick<OriginalRoleResources, "cu
   async function history(room: string): Promise<CommandReply> {
     const files = room === "层" ? historical : historical.filter(path => path.endsWith(`历代12${room}最低输出量.jpg`));
     const { images, missing } = await find(files);
-    if (!images.length) return "原深渊最低输出量图暂不可用，请稍后再试。";
+    if (!images.length) return $t("abyss-references.text_8eaccf5bf5");
     if (files.length === 1) return images[0]!;
-    const notice = missing.length && `原图暂缺${missing.map(file => basename(file, ".jpg")).join("、")}。`;
-    const nodes = ["历代深渊12层最低输出量", ...(notice ? [notice] : []), ...images];
+    const notice = missing.length && $t("abyss-references.text_c5e13f74d7", { "value1": missing.map(file => basename(file, ".jpg")).join("、") });
+    const nodes = [$t("abyss-references.text_92d31fba90"), ...(notice ? [notice] : []), ...images];
     return forward && images.length > 1 ? { type: "forward", nodes } : nodes;
   }
 
@@ -98,7 +101,7 @@ export function createAbyssReferences(resources: Pick<OriginalRoleResources, "cu
     const version = /^#?([1-9]\.\d)深渊阵容(?:参考|推荐)?$/u.exec(input)?.[1];
     if (version) {
       const file = `${teamDirectory}/${version}.png`;
-      return find([file], file === originalTeam).then(({ images }) => images[0] ?? `暂无${version}深渊阵容`);
+      return find([file], file === originalTeam).then(({ images }) => images[0] ?? $t("abyss-references.text_12277d820b", { "version": version }));
     }
   };
 }
