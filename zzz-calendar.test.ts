@@ -81,13 +81,17 @@ test("绝区零沿用生产日历的版本公告、常驻公告及两类挑战�
 
 test("绝区零日历命令走原国服公告接口，失败给出对应提示", async () => {
   const urls: string[] = [];
+  const finished = Promise.withResolvers<void>();
   const transport = (async (url: string, init: RequestInit) => {
     urls.push(url);
+    if (urls.length === 6) finished.resolve();
     expect(init.credentials).toBe("omit");
     return new Response(null, { status: 503 });
   }) as typeof fetch;
   const calendar = createZzzCalendar({ fetch: transport });
   expect(await calendar("#绝区零日历列表")).toContain("无法读取绝区零官方");
-  expect(urls).toEqual([zzzCalendarListUrl, zzzCalendarContentUrl]);
+  await finished.promise;
+  expect(urls.filter(url => url === zzzCalendarListUrl)).toHaveLength(3);
+  expect(urls.filter(url => url === zzzCalendarContentUrl)).toHaveLength(3);
   expect(calendar("#星铁日历")).toBeUndefined();
 });

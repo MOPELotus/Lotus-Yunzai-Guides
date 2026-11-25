@@ -139,5 +139,5 @@ test("官网公告可补冷启仍在运行的上一版本，同时只保留已�
   expect(archived(await source())).toHaveLength(1);
   clock += 5_000;
   expect(archived(await source())).toEqual([]);
-  expect(archives).toBe(2);
+  expect(archives).toBe(4);
 });

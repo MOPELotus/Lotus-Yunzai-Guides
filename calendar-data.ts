@@ -1,4 +1,5 @@
 // Adapted from Miao-Plugin apps/wiki/Calendar.js, CalendarSr.js and CalendarZZZ.js (MIT).
+import { withReadRetries } from "@lotus-yunzai/http";
 export const calendarListUrl = "https://hkrpg-api.mihoyo.com/common/hkrpg_cn/announcement/api/getAnnList?game=hkrpg&game_biz=hkrpg_cn&lang=zh-cn&auth_appid=announcement&authkey_ver=1&bundle_id=hkrpg_cn&channel_id=1&level=65&platform=pc&region=prod_gf_cn&sdk_presentation_style=fullscreen&sdk_screen_transparent=true&sign_type=2&uid=100000000";
 // The official Chinese site's announcements channel includes full bodies and prior release notices.
 export const starrailCalendarNewsUrl = "https://act-api-takumi-static.mihoyo.com/content_v2_user/app/1963de8dc19e461c/getContentList?iChanId=257&iPage=1&iPageSize=20&sLangKey=zh-cn&isPreview=0";
@@ -423,10 +424,11 @@ export async function readCalendarBytes(response: Response, limit: number) {
 }
 
 export function calendarTransport(transport: typeof fetch, active?: AbortSignal) {
+  const request = withReadRetries((target, init) => transport(target.href, init));
   return (url: string) => {
     const timeout = AbortSignal.timeout(12_000);
     const signal = active ? AbortSignal.any([active, timeout]) : timeout;
-    return transport(url, { signal, redirect: "error", credentials: "omit" });
+    return request(new URL(url), { signal, redirect: "error", credentials: "omit" });
   };
 }
 

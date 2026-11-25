@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@lotus-yunzai/skia": "workspace:*",
+    "@lotus-yunzai/http": "workspace:*",
     "node-schedule": "2.1.2",
     "skia-canvas": "4.0.1"
   }

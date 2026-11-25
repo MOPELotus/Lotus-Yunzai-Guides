@@ -113,3 +113,45 @@ test("虚空深渊帮助使用内置原图，不在首次调用下载固定素�
   expect((result as { type: string }).type).toBe("image");
   expect(requests).toBe(0);
 });
+
+test("虚空榜单每份数据总三次，网络故障直连回退与HTTP原路重试不叠乘", async () => {
+  for (const first of ["network", "http"] as const) {
+    const attempts = new Map<string, (false | undefined)[]>();
+    const handler = createAkashaAbyss({ signal: new AbortController().signal, clock: () => older,
+      async transport(url, options) {
+        const sent = attempts.get(url) ?? [];
+        sent.push(options.proxy); attempts.set(url, sent);
+        if (sent.length === 1 && first === "network") throw Object.assign(new Error("reset"), { code: "ECONNRESET" });
+        if (sent.length === 1 || sent.length === 2) return new Response(null, { status: 502 });
+        return url.endsWith("abyss_total.js") ? response("static_abyss_total", source) : response("static_card_dict", roster);
+      },
+      draw: async () => { throw new Error("仅验证读取与文字回退"); },
+    });
+    expect(await handler("#虚空五星使用率")).toContain("84.1%");
+    expect(attempts.size).toBe(2);
+    for (const sent of attempts.values()) expect(sent).toEqual(first === "network"
+      ? [undefined, false, false] : [undefined, undefined, undefined]);
+    await handler("#虚空四星使用率");
+    for (const sent of attempts.values()) expect(sent).toHaveLength(3);
+  }
+});
+
+test("虚空榜单永久错误、Retry-After和取消不重发", async () => {
+  for (const limited of [false, true]) {
+    const attempts = new Map<string, number>();
+    const handler = createAkashaAbyss({ signal: new AbortController().signal,
+      async transport(url) {
+        attempts.set(url, (attempts.get(url) ?? 0) + 1);
+        return new Response(null, { status: limited ? 503 : 403,
+          headers: limited ? { "Retry-After": "60" } : {} });
+      },
+    });
+    expect(await handler("#虚空五星使用率")).toContain("暂时不可用");
+    expect([...attempts.values()]).toEqual([1, 1]);
+  }
+  const controller = new AbortController(); let calls = 0;
+  const cancelled = createAkashaAbyss({ signal: controller.signal,
+    async transport() { calls++; controller.abort(); throw Object.assign(new Error("reset"), { code: "ECONNRESET" }); } });
+  expect(await cancelled("#虚空五星使用率")).toBeUndefined();
+  expect(calls).toBe(1);
+});

@@ -1,4 +1,5 @@
 import { builtinResourceDirectory } from "../../lib/builtin-resources.ts";
+import { transientReadResponse, withReadRetries } from "@lotus-yunzai/http";
 import type { MessageSegment } from "../../lib/messages.ts";
 import type { AkashaCard, drawAkashaCard } from "./akasha-card.ts";
 import { resolveGuideRole } from "./role-guide-input.ts";
@@ -104,11 +105,22 @@ async function fetchBytes(url: string, limit: number, request: Transport, signal
   const deadline = AbortSignal.any([signal, AbortSignal.timeout(9_000)]);
   const options = { redirect: "error", credentials: "omit", signal: deadline } as const;
   let reply: Response;
+  const base = (target: URL, init: RequestInit & { readonly proxy?: false }) => request(target.href, init);
+  const once = withReadRetries(base, { attempts: 1 });
+  const remaining = withReadRetries(base, { attempts: 2 });
+  let usedFallback = false;
   try {
-    reply = await request(url, options);
+    reply = await once(new URL(url), options);
   } catch {
     deadline.throwIfAborted();
-    reply = await request(url, { ...options, proxy: false });
+    usedFallback = true;
+    reply = await remaining(new URL(url), { ...options, proxy: false });
+  }
+  if (!usedFallback && transientReadResponse(reply)) {
+    await reply.body?.cancel().catch(() => {});
+    // HTTP failures stay on the original route; only the existing network
+    // failure fallback is allowed to switch this public source to direct.
+    reply = await remaining(new URL(url), options);
   }
   if (!reply.ok || !reply.body || Number(reply.headers.get("content-length")) > limit) {
     await reply.body?.cancel();

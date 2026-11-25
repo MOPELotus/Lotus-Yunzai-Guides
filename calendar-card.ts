@@ -1,4 +1,5 @@
 import { prepareBuiltinFonts, builtinFontFallback } from "../../packages/skia/builtin-fonts.ts";
+import { withReadRetries } from "@lotus-yunzai/http";
 // Layout and colors adapted from Miao-Plugin resources/wiki/calendar.html and calendar.css (MIT).
 import { realpath } from "node:fs/promises";
 import { join } from "node:path";
@@ -57,7 +58,7 @@ async function webImage(url: string, transport: typeof fetch, signal?: AbortSign
   if (!officialCalendarImage(url)) return;
   try {
     const deadline = AbortSignal.timeout(5_000);
-    const response = await transport(url, {
+    const response = await withReadRetries((target, init) => transport(target.href, init))(new URL(url), {
       redirect: "error", credentials: "omit", signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
     });
     if (!response.ok || !response.body) return;

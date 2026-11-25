@@ -46,14 +46,20 @@ test("原神区分公告分类，读取祈愿正文日期和绝对开服时间",
 
 test("原神日历使用原国服公告，旧品牌入口停用", async () => {
   const requests: string[] = [];
-  const transport = (async (url: string) => { requests.push(url); return new Response(null, { status: 503 }); }) as typeof fetch;
+  const finished = Promise.withResolvers<void>();
+  const transport = (async (url: string) => {
+    requests.push(url); if (requests.length === 6) finished.resolve();
+    return new Response(null, { status: 503 });
+  }) as typeof fetch;
   const command = createGenshinCalendar({ fetch: transport });
   for (const name of ["喵喵日历", "喵喵日历列表", "#喵喵日历", "#喵喵日历列表"]) {
     expect(command(name)).toBeUndefined();
   }
   expect(requests).toEqual([]);
   expect(await command("#日历列表")).toContain("无法读取原神官方");
-  expect(requests).toEqual([genshinCalendarListUrl, genshinCalendarContentUrl]);
+  await finished.promise;
+  expect(requests.filter(url => url === genshinCalendarListUrl)).toHaveLength(3);
+  expect(requests.filter(url => url === genshinCalendarContentUrl)).toHaveLength(3);
   expect(command("#星铁日历")).toBeUndefined();
 });
 

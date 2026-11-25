@@ -61,16 +61,19 @@ test("旧 cal 与动态日历分流，断线只复用未过期的原图", async 
   clock.time += 49 * minute;
   expect(await use("%cal")).toBe("获取活动列表失败");
   const dynamicCalls: string[] = [];
+  const failedBatch = Promise.withResolvers<void>();
   const failed = (async (input: string) => {
     dynamicCalls.push(input);
+    if (dynamicCalls.length === 6) failedBatch.resolve();
     return new Response(null, { status: 503 });
   }) as typeof fetch;
   const calendar = createZzzCalendar({ fetch: failed });
   expect(await calendar("#绝区零日历列表")).toContain("官方活动公告");
-  expect(dynamicCalls).toHaveLength(2);
+  await failedBatch.promise;
+  expect(dynamicCalls).toHaveLength(6);
   expect(dynamicCalls.every(input => !new URL(input).searchParams.has("t"))).toBe(true);
   expect(await calendar("#绝区零cal")).toBe("获取活动列表失败");
-  expect(dynamicCalls).toHaveLength(3);
+  expect(dynamicCalls).toHaveLength(9);
 });
 
 test("未发布、原图缺失、远端改版及失败回退不能发送旧图或陌生 CDN", async () => {
