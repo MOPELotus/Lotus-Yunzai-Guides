@@ -62,7 +62,7 @@ export async function drawAkashaCard(card: AkashaCard, readImage: ReadImage, mod
     context.fillStyle = "#10162544";
     context.fillRect(0, 0, width, height);
 
-    label(context, "Lotus-Yunzai · @容容容三岁 设计", width - 56, 86, 31, { align: "right", color: "#f6e5cc" });
+    label(context, "Lotus-Yunzai · @容容容三岁 设计", width - 56, 86, 31, { align: "right", color: "#fff" });
     label(context, card.meta, width - 56, 135, 32, { align: "right" });
     if (card.history) label(context, card.history, width - 56, 181, 36, { align: "right", color: "#ffda96" });
 
