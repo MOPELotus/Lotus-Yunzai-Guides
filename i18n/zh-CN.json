@@ -5,107 +5,107 @@
   "description": "攻略",
   "sections": {
     "abyss-references": {
-      "description": "攻略",
+      "description": "深渊阵容推荐与历代深渊最低输出量参考图查询",
       "source": "plugins/guides/abyss-references.ts"
     },
     "akasha-abyss": {
-      "description": "攻略",
+      "description": "虚空深渊数据抓取、解析与指令查询",
       "source": "plugins/guides/akasha-abyss.ts"
     },
     "akasha-card": {
-      "description": "攻略：图片卡片",
+      "description": "虚空深渊使用率与队伍榜单图片卡片渲染",
       "source": "plugins/guides/akasha-card.ts"
     },
     "banner-tables": {
-      "description": "攻略",
+      "description": "角色与武器卡池复刻时间表图片查询",
       "source": "plugins/guides/banner-tables.ts"
     },
     "calendar": {
-      "description": "攻略：日历",
+      "description": "处理星铁、原神、绝区零的官方活动日历查询、图片渲染及文本回退展示",
       "source": "plugins/guides/calendar.ts"
     },
     "calendar-card": {
-      "description": "攻略：日历 · 图片卡片",
+      "description": "格式化活动时间与倒计时标签，将日历排期和角色生日渲染为图片卡片并校验体积上限",
       "source": "plugins/guides/calendar-card.ts"
     },
     "calendar-data": {
-      "description": "攻略：日历",
+      "description": "从游戏官方公告接口拉取并解析活动、卡池与周期玩法排期，生成结构化日历数据",
       "source": "plugins/guides/calendar-data.ts"
     },
     "calendar-schedule": {
-      "description": "攻略：日历 · 排期",
+      "description": "管理定时日历推送任务、群聊黑白名单、状态文件持久化及主人配置指令",
       "source": "plugins/guides/calendar-schedule.ts"
     },
     "genshin-calendar-theme": {
-      "description": "攻略：原神 · 日历",
+      "description": "提供原神日历主题所需的地区与天赋书系列名称映射",
       "source": "plugins/guides/genshin-calendar-theme.ts"
     },
     "genshin-strategy": {
-      "description": "攻略：原神",
+      "description": "原神编号攻略来源映射、帮助信息及默认攻略设置",
       "source": "plugins/guides/genshin-strategy.ts"
     },
     "genshin-wish-countdown": {
-      "description": "攻略：原神 · 模拟祈愿",
+      "description": "原神国服当前卡池时间核验与剩余天数查询",
       "source": "plugins/guides/genshin-wish-countdown.ts"
     },
     "guide-configuration": {
-      "description": "攻略",
+      "description": "攻略配置文件（YAML）的读取与格式校验",
       "source": "plugins/guides/guide-configuration.ts"
     },
     "index": {
-      "description": "攻略",
+      "description": "攻略模块入口、资源手动刷新命令与后台定时更新调度",
       "source": "plugins/guides/index.ts"
     },
     "original-role-resources": {
-      "description": "攻略",
+      "description": "角色原图、复刻表及深渊参考等静态资源的下载、校验与本地缓存管理",
       "source": "plugins/guides/original-role-resources.ts"
     },
     "role-guide-collections": {
-      "description": "攻略",
+      "description": "攻略合集数据解析、远端拉取与响应校验",
       "source": "plugins/guides/role-guide-collections.ts"
     },
     "role-guide-input": {
-      "description": "攻略",
+      "description": "角色攻略指令输入解析与多形态主角消歧",
       "source": "plugins/guides/role-guide-input.ts"
     },
     "role-guides": {
-      "description": "攻略：攻略",
+      "description": "角色攻略查询、默认攻略来源设置及指令路由处理",
       "source": "plugins/guides/role-guides.ts"
     },
     "role-materials": {
-      "description": "攻略",
+      "description": "角色养成原素材图查询与发送",
       "source": "plugins/guides/role-materials.ts"
     },
     "role-references": {
-      "description": "攻略",
+      "description": "原神与星铁角色参考面板图例及旧版历史面板查询",
       "source": "plugins/guides/role-references.ts"
     },
     "role-resource-pack": {
-      "description": "攻略",
+      "description": "角色攻略与参考面板原图资源包的 Git 拉取、完整性校验及本地缓存管理",
       "source": "plugins/guides/role-resource-pack.ts"
     },
     "starrail-guide-history": {
-      "description": "攻略：星铁",
+      "description": "提供星穹铁道历史版本攻略查询（含命途攻略、强度榜、收益曲线、商店光锥推荐及 1.0 忘却之庭配队攻略）",
       "source": "plugins/guides/starrail-guide-history.ts"
     },
     "starrail-strategy": {
-      "description": "攻略：星铁",
+      "description": "星穹铁道角色攻略查询与默认来源设置",
       "source": "plugins/guides/starrail-strategy.ts"
     },
     "team-guides": {
-      "description": "攻略：攻略",
+      "description": "原神配队攻略查询与资源读取",
       "source": "plugins/guides/team-guides.ts"
     },
     "team-resources": {
-      "description": "攻略",
+      "description": "原神配队攻略资源同步与缓存管理",
       "source": "plugins/guides/team-resources.ts"
     },
     "zzz-official-calendar": {
-      "description": "攻略：绝区零 · 日历",
+      "description": "绝区零官方活动日历查询",
       "source": "plugins/guides/zzz-official-calendar.ts"
     },
     "zzz-strategy": {
-      "description": "攻略：绝区零",
+      "description": "绝区零角色攻略查询与默认来源设置",
       "source": "plugins/guides/zzz-strategy.ts"
     }
   },
@@ -189,7 +189,7 @@
     "calendar-schedule.text_400ae55a6d": "请输入有效群号，或发送「取消」。",
     "calendar-schedule.text_4742cbb6a9": "群聊名单包含无效群号。",
     "calendar-schedule.text_484d556139": "无",
-    "calendar-schedule.text_4b4ca7e1eb": "添加成功：在 {cron} 执行发送 {value2}。",
+    "calendar-schedule.text_4b4ca7e1eb": "添加成功：在 {cron} 发送 {value2}。",
     "calendar-schedule.text_5205fa08db": "日历任务列表无效。",
     "calendar-schedule.text_65e93eb60e": "该定时任务已存在。",
     "calendar-schedule.text_696e51e73c": "日历副本格式无效或包含旧版不能表示的配置。",
@@ -528,273 +528,273 @@
   },
   "parameters": {
     "abyss-references.text_b27a2737eb": {
-      "version": "version"
+      "version": "深渊版本号"
     },
     "abyss-references.text_c5e13f74d7": {
-      "value1": "missing.map(file => basename(file, \".jpg\")).join(\"、\")"
+      "value1": "缺失图片名称列表"
     },
     "abyss-references.text_12277d820b": {
-      "version": "version"
+      "version": "深渊版本号"
     },
     "akasha-abyss.text_b8adf97467": {
-      "version": "source.version"
+      "version": "深渊版本描述"
     },
     "akasha-abyss.text_57d32b4df7": {
-      "date": "source.date"
+      "date": "数据更新日期时间"
     },
     "akasha-abyss.text_7ada4813e5": {
-      "lead": "lead"
+      "lead": "榜单标题前缀"
     },
     "akasha-abyss.text_8a56c6ab9d": {
-      "rarity": "query.rarity"
+      "rarity": "角色星级"
     },
     "akasha-abyss.text_ac623ce2f3": {
-      "lead": "lead",
-      "page": "query.page"
+      "lead": "榜单标题前缀",
+      "page": "当前页码"
     },
     "akasha-abyss.text_838ac0ba92": {
-      "half": "query.half",
-      "sort": "query.sort"
+      "half": "深渊半区（上半/下半/全部）",
+      "sort": "排序方式"
     },
     "akasha-abyss.text_85032a4f47": {
-      "value1": "row.names.join(\"、\")",
-      "count": "row.count",
-      "value3": "row.full.toFixed(2)",
-      "ratio": "row.ratio"
+      "value1": "队伍角色名称列表",
+      "count": "出战次数",
+      "value3": "满星率百分比",
+      "ratio": "上下比"
     },
     "akasha-abyss.text_54595f6d35": {
-      "page": "card.page",
-      "pageCount": "card.pageCount"
+      "page": "当前页码",
+      "pageCount": "总页数"
     },
     "akasha-card.text_472afe95aa": {
-      "page": "card.page",
-      "pageCount": "card.pageCount"
+      "page": "当前页码",
+      "pageCount": "总页数"
     },
     "banner-tables.text_d0f7ae914c": {
-      "value1": "missing.map(file => file.slice(\"Banners/\".length, -4)).join(\"、\")"
+      "value1": "缺失复刻表名称列表"
     },
     "calendar-card.text_b4baa30d48": {
-      "value1": "Math.round(milliseconds / day)"
+      "value1": "四舍五入后的剩余天数"
     },
     "calendar-card.text_f512482fac": {
-      "value1": "Math.floor(milliseconds / 3_600_000)"
+      "value1": "向下取整后的剩余小时数"
     },
     "calendar-card.text_1bd5b8aea7": {
-      "value1": "Math.max(1, Math.floor(milliseconds / 60_000))"
+      "value1": "分钟数"
     },
     "calendar-card.text_76fed77dc3": {
-      "value1": "time(row.start)"
+      "value1": "活动或条目的开始时间"
     },
     "calendar-card.text_d38262246e": {
-      "value1": "time(row.end)"
+      "value1": "活动或条目的结束时间"
     },
     "calendar-card.text_32f584bc7c": {
-      "value1": "time(row.earliestEnd)",
-      "value2": "time(row.end)"
+      "value1": "最早结束时间",
+      "value2": "最晚结束时间"
     },
     "calendar-card.text_26f9f67809": {
-      "value1": "showStart ? start + \" ~ \" : \"\"",
-      "end": "end"
+      "value1": "可选的开始时间前缀",
+      "end": "结束时间"
     },
     "calendar-card.text_16b0a042a3": {
-      "start": "start",
-      "value2": "relative(row.start - now)"
+      "start": "开始时间",
+      "value2": "距开始的相对时间"
     },
     "calendar-card.text_92a75f517c": {
-      "value1": "showStart ? start + \" ~ \" : \"\"",
-      "end": "end",
-      "value3": "relative(row.end - now)"
+      "value1": "可选的开始时间及连接符",
+      "end": "结束时间",
+      "value3": "距结束的剩余时间"
     },
     "calendar-card.text_fa4962f757": {
-      "value1": "cell.getUTCMonth() + 1"
+      "value1": "月份数值"
     },
     "calendar-card.text_e6ad509939": {
-      "value1": "cell.getUTCDate()"
+      "value1": "日期中的日数值"
     },
     "calendar-card.text_4f0d66e2e2": {
-      "value1": "weekdays[cell.getUTCDay()]"
+      "value1": "星期几单字"
     },
     "calendar-card.text_d63c6143d3": {
-      "value1": "time(data.now, true)"
+      "value1": "当前格式化日期时间"
     },
     "calendar-card.text_ffe1c0506d": {
-      "value1": "time(data.updated, true)"
+      "value1": "上次获取公告的格式化时间"
     },
     "calendar-schedule.text_c969a31cec": {
-      "value1": "current.whiteList.join(\", \") || \"无\"",
-      "value2": "current.blackList.join(\", \") || \"无\""
+      "value1": "白名单群号列表（为空时显示“无”）",
+      "value2": "黑名单群号列表（为空时显示“无”）"
     },
     "calendar-schedule.text_e3bc6225fb": {
-      "value1": "index + 1",
-      "cron": "cron",
-      "value3": "labels[type]"
+      "value1": "任务序号",
+      "cron": "定时任务的 Cron 表达式",
+      "value3": "定时发送的日历类型名称"
     },
     "calendar-schedule.text_4b4ca7e1eb": {
-      "cron": "entry.cron",
-      "value2": "labels[entry.type]"
+      "cron": "定时任务的 Cron 表达式",
+      "value2": "定时发送的日历类型名称"
     },
     "calendar-schedule.text_e669edb409": {
-      "id": "id"
+      "id": "添加的群组或条目ID"
     },
     "calendar-schedule.text_b96173785e": {
-      "id": "id"
+      "id": "群聊 ID"
     },
     "calendar.text_b7eb5fa21a": {
-      "value1": "table.rows.length - lines.length"
+      "value1": "未显示的剩余活动数量"
     },
     "calendar.text_d694fb6a44": {
-      "label": "config.label"
+      "label": "游戏名称标签"
     },
     "genshin-calendar-theme.text_989e7d532a": {
-      "name": "name"
+      "name": "天赋系列名称"
     },
     "genshin-wish-countdown.text_c4a7d5858b": {
-      "value1": "Math.ceil((deadline - completed) / day)"
+      "value1": "当前卡池剩余天数"
     },
     "index.text_d04679c243": {
-      "label": "source.label"
+      "label": "资源来源名称"
     },
     "index.text_6660325f0e": {
-      "label": "label"
+      "label": "资源类型标签"
     },
     "index.text_8e27ae72b0": {
-      "label": "label"
+      "label": "资源类型标签"
     },
     "index.text_2fac30c3f5": {
-      "label": "label"
+      "label": "资源类型标签"
     },
     "index.text_07354106bb": {
-      "stage": "stage",
-      "value2": "outcome === \"unknown\" ? \"结果待核对\" : \"失败\""
+      "stage": "定时日历任务执行阶段",
+      "value2": "执行结果状态文本"
     },
     "original-role-resources.text_758e0dd70a": {
-      "length": "missing.length"
+      "length": "缺失文件数量"
     },
     "original-role-resources.text_10b737a56b": {
-      "path": "item.path"
+      "path": "已获取资源文件的路径"
     },
     "role-guide-input.text_67139deb3a": {
-      "name": "name"
+      "name": "旅行者名称"
     },
     "role-guide-input.text_cc21baabe2": {
-      "input": "input",
-      "value2": "trailblazers.map(([name]) => `${name}主攻略`).join(\"、\")"
+      "input": "用户输入的角色关键词",
+      "value2": "可选攻略列表"
     },
     "role-guide-input.text_2c91d48dd0": {
-      "name": "name"
+      "name": "开拓者属性名称"
     },
     "role-guides.text_58b8b6d917": {
-      "name": "role.name",
-      "source": "author.source"
+      "name": "角色名称",
+      "source": "攻略来源名称"
     },
     "role-guides.text_b783a829fe": {
-      "name": "role.name",
-      "label": "gamePath.label"
+      "name": "角色名称",
+      "label": "游戏名称"
     },
     "role-guides.text_353dfeb909": {
-      "source": "source",
-      "value2": "genshinStrategySource(source)!.source"
+      "source": "攻略来源编号",
+      "value2": "攻略来源名称"
     },
     "role-guides.text_8b7f0ff356": {
-      "name": "role.name",
-      "label": "guideGames[game].label"
+      "name": "角色名称",
+      "label": "游戏名称"
     },
     "role-materials.text_1e977905d7": {
-      "name": "role.name"
+      "name": "角色名称"
     },
     "role-materials.text_6101723621": {
-      "name": "role.name"
+      "name": "角色名称"
     },
     "role-references.text_9c1ee39a9e": {
-      "mainProp": "info.mainProp",
-      "viceProp": "info.viceProp"
+      "mainProp": "推荐主词条",
+      "viceProp": "推荐副词条"
     },
     "role-references.text_414700cbe8": {
-      "brief": "info.brief"
+      "brief": "角色简评内容"
     },
     "role-references.text_c93d0b7917": {
-      "name": "name"
+      "name": "角色名称"
     },
     "role-references.text_7cc599b706": {
-      "value1": "name === undefined ? \"参考面板图例\" : `${name}参考面板`"
+      "value1": "参考面板名称或图例"
     },
     "role-references.text_0debbb8962": {
-      "name": "name"
+      "name": "角色名称"
     },
     "role-references.text_91a4a78b0f": {
-      "name": "name"
+      "name": "角色名称"
     },
     "role-references.text_a87ab2d5e8": {
-      "name": "role.name"
+      "name": "角色名称"
     },
     "starrail-guide-history.text_37763bb640": {
-      "value1": "floorNumbers[Math.floor((index - 1) / 3)]"
+      "value1": "层数中文数字"
     },
     "starrail-guide-history.text_8fc7625790": {
-      "heading": "heading",
-      "value2": "recommendation[0]",
-      "value3": "recommendation[1]",
-      "value4": "recommendation[2]"
+      "heading": "关卡标题",
+      "value2": "推荐输出角色",
+      "value3": "推荐辅助角色",
+      "value4": "推荐生存角色"
     },
     "starrail-guide-history.text_80aa9405b7": {
-      "title": "title"
+      "title": "攻略标题"
     },
     "starrail-guide-history.text_fdacb66105": {
-      "value1": "missing.join(\"、\")"
+      "value1": "缺失原图的攻略页面名称列表（以顿号分隔）"
     },
     "starrail-strategy.text_88721e6ca7": {
-      "number": "number",
-      "source": "author.source",
-      "displayName": "displayName"
+      "number": "攻略来源编号",
+      "source": "攻略作者或来源名称",
+      "displayName": "角色显示名称"
     },
     "starrail-strategy.text_91855e03f8": {
-      "displayName": "displayName",
-      "value2": "source === 0 ? \"旧编号来源\" : sources[source - 1]!.source"
+      "displayName": "角色显示名称",
+      "value2": "所查询的攻略来源名称或旧编号来源统称"
     },
     "starrail-strategy.text_7a393835c0": {
-      "value1": "missing.join(\"、\")"
+      "value1": "缺失原图的攻略来源名称列表（以顿号分隔）"
     },
     "starrail-strategy.text_78cc00bb61": {
-      "displayName": "displayName"
+      "displayName": "角色显示名称"
     },
     "starrail-strategy.text_19a4b2724d": {
-      "value": "value",
-      "source": "sources[value - 1]!.source"
+      "value": "攻略来源编号",
+      "source": "攻略作者或来源名称"
     },
     "starrail-strategy.text_454d08bcaf": {
-      "value1": "value === 0 ? \"为全部旧编号来源\" : `来源 ${value}（${sources[value - 1]!.source}）`"
+      "value1": "已设置的默认来源说明（全部旧编号来源或指定来源编号及名称）"
     },
     "team-guides.text_380ec1b133": {
-      "name": "name"
+      "name": "元素名称"
     },
     "team-guides.text_55c213041f": {
-      "query": "query",
-      "value2": "travelerElements.map((name) => `${name}配队`).join(\"、\")"
+      "query": "查询的旅行者名称",
+      "value2": "可选元素配队列表"
     },
     "team-guides.text_b992115dc4": {
-      "query": "query"
+      "query": "查询的角色或配队名称"
     },
     "team-guides.text_2511a2f3b2": {
-      "query": "query"
+      "query": "查询的角色或配队名称"
     },
     "team-resources.text_a9ec0cb77b": {
-      "command": "command"
+      "command": "执行的 Git 子命令"
     },
     "team-resources.text_1cb4236449": {
-      "file": "file"
+      "file": "已下载的资源文件路径"
     },
     "zzz-official-calendar.text_3298c8161e": {
-      "url": "result.url"
+      "url": "官方活动日历原图链接"
     },
     "zzz-strategy.text_16af525009": {
-      "name": "name",
-      "source": "author.source"
+      "name": "角色名称",
+      "source": "攻略来源名称"
     },
     "zzz-strategy.text_3accd00fae": {
-      "value1": "selected ? ` ${selected}（${sources[selected - 1]!.source}）` : \"为全部\""
+      "value1": "设置的来源编号与名称或全部"
     },
     "zzz-strategy.text_ddd4370c0d": {
-      "selected": "selected"
+      "selected": "设定的攻略显示数量上限"
     }
   }
 }
