@@ -76,6 +76,8 @@ test("三游戏保留旧攻略命令、配置源、本地覆盖及旧 Atlas，�
     await put("upstream/StarRail/Roles/RefStat/RefNotes.yaml", "url: https://www.miyoushe.com/sr/article/456\n");
     await put("atlas/star-rail-atlas/guide for role/1310.png", image("流萤旧 Atlas"));
     await put("atlas/zzz-atlas/角色攻略/艾莲.png", image("艾莲旧 Atlas"));
+    // A similarly named atlas category is character art, not the retained guide source.
+    await put("atlas/zzz-atlas/角色/艾莲.png", image("普通角色图不是攻略"));
     await put("roleGuides/add_ons/Asgater/gs/钟离.jpg", image("钟离本地覆盖"));
     await put("oldStrategy/2/钟离.jpg", image("钟离旧缓存"));
     await put("config/roleGuides.yaml", `news:
@@ -140,6 +142,8 @@ olds: [{source: 原神观测枢, collection_id: [813033]}]
     expect(await search("#星铁萨姆一图流")).toEqual(forwarded("流萤攻略~", "流萤旧 Atlas", "2.png"));
     expect(requested).not.toContain("5");
     expect(await search("#绝区零艾莲攻略")).toEqual(forwarded("艾莲攻略~", "艾莲包", "艾莲旧 Atlas", "3.png"));
+    expect(await readFile(join(root, "atlas/zzz-atlas/角色攻略/艾莲.png"))).toEqual(image("艾莲旧 Atlas"));
+    expect(await readFile(join(root, "atlas/zzz-atlas/角色/艾莲.png"))).toEqual(image("普通角色图不是攻略"));
     expect(await search("#星铁丹恒攻略")).toEqual(part("丹恒包"));
     expect(await search("#星铁腾荒攻略")).toEqual(part("腾荒包"));
     expect(await search("#不存在角色攻略")).toBeUndefined();

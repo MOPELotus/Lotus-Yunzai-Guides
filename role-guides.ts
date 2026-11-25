@@ -96,7 +96,7 @@ export function createRoleGuides(options: {
       const bytes = byId ?? await readGuideImage(directory, name + ".png");
       if (bytes) return { source: $t("role-guides.text_924f484f0d"), bytes };
     } else {
-      const bytes = await readGuideImage(join(options.atlas, "zzz-atlas", "角色"), name + ".png");
+      const bytes = await readGuideImage(join(options.atlas, "zzz-atlas", "角色攻略"), name + ".png");
       if (bytes) return { source: $t("role-guides.text_1acdcd6272"), bytes };
     }
   }
