@@ -1,3 +1,4 @@
+import { brandTextColor } from "@lotus-yunzai/skia/brand-color";
 import { renderPng } from "@lotus-yunzai/skia";
 import { loadImage, type CanvasRenderingContext2D as Context, type Image } from "skia-canvas";
 
@@ -23,6 +24,7 @@ function label(context: Context, text: string, x: number, y: number, size: numbe
   context.fillStyle = color;
   context.font = `800 ${size}px ${serif}`;
   context.textAlign = align;
+  if (text.includes("Lotus-Yunzai")) context.fillStyle = brandTextColor(context, text, x, y, maxWidth);
   if (maxWidth) context.fillText(text, x, y, maxWidth);
   else context.fillText(text, x, y);
 }
