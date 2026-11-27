@@ -110,6 +110,8 @@
     }
   },
   "messages": {
+    "team-resources.git-error": "攻略资源拉取失败（Git {command}）：{details}",
+    "team-resources.git-retry": "攻略资源拉取失败，{seconds} 秒后进行第 {attempt}/{total} 次重试",
     "abyss-references.text_12277d820b": "暂无{version}深渊阵容",
     "abyss-references.text_8eaccf5bf5": "原深渊最低输出量图暂不可用，请稍后再试。",
     "abyss-references.text_92d31fba90": "历代深渊12层最低输出量",
@@ -527,6 +529,8 @@
     "zzz-strategy.text_f1ade3a6a7": "请选择攻略编号 0–7 或 all。"
   },
   "parameters": {
+    "team-resources.git-error": {"command": "执行的 Git 子命令", "details": "经脱敏与截断处理的实际 Git 错误诊断摘要"},
+    "team-resources.git-retry": {"attempt": "当前重试次数", "total": "最大重试次数", "seconds": "重试等待秒数"},
     "abyss-references.text_b27a2737eb": {
       "version": "深渊版本号"
     },

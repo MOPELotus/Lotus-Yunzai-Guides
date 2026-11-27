@@ -7,6 +7,7 @@ import { reportResourceProgress, type ResourceProgressCallback } from "../../lib
 import { lstat, mkdir, mkdtemp, readdir, readlink, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { devNull } from "node:os";
+import { setTimeout as delay } from "node:timers/promises";
 import { dirname, join } from "node:path";
 import { lockFile } from "../../lib/file-lock.ts";
 import { indexedTeamImages, pngHeader, readResource, teamGuideAuthors } from "./team-guides.ts";
@@ -17,8 +18,8 @@ export const guideSource = "https://gitee.com/Rrrrrrray/mora-plugin-res.git";
 export const guideSourceRef = "refs/heads/master";
 export class GuideSourceGitError extends Error {
   readonly code = "guide-source-git";
-  constructor(command: string) {
-    super($t("team-resources.text_a9ec0cb77b", { "command": command }));
+  constructor(command: string, details = "") {
+    super(details ? $t("team-resources.git-error", { command, details }) : $t("team-resources.text_a9ec0cb77b", { command }));
     this.name = "GuideSourceGitError";
   }
 }
@@ -124,11 +125,18 @@ async function clearGuideGitTransientFiles(directory: string) {
   await Promise.all(files.filter(name => /^(?:tmp_pack_|tmp_idx_)/u.test(name)).map(name => rm(join(packDirectory, name), { force: true })));
 }
 
+function safeGitDiagnostic(line: string) {
+  return line.replace(/https?:\/\/[^\s'"<>]+/giu, value => {
+    try { const url = new URL(value); url.username = ""; url.password = ""; url.search = ""; url.hash = ""; return url.href; }
+    catch { return "[URL]"; }
+  }).replace(/\x1b\[[0-9;]*[A-Za-z]/gu, "").replace(/[\p{Cc}\p{Cf}]/gu, " ").trim().slice(0, 500);
+}
+
 function gitClient(directory: string, source: string, signal: AbortSignal, onProgress?: ResourceProgressCallback) {
   const binary = Bun.which("git", { PATH: process.env.PATH });
   if (!binary) throw new Error($t("team-resources.text_ebd17512d3"));
   const env = gitOptions(source);
-  return async (args: readonly string[], stdin?: Uint8Array, maxBuffer = maxIndex): Promise<Buffer> => {
+  const execute = async (args: readonly string[], stdin?: Uint8Array, maxBuffer = maxIndex): Promise<Buffer> => {
     const active = args.includes("fetch") ? AbortSignal.any([signal, AbortSignal.timeout(10 * 60_000)]) : signal;
     active.throwIfAborted();
     const child = Bun.spawn([
@@ -142,6 +150,14 @@ function gitClient(directory: string, source: string, signal: AbortSignal, onPro
       }
     };
     active.addEventListener("abort", stop, { once: true });
+    const recentDiagnostics: string[] = [];
+    const reportDiagnostic = (input: string) => {
+      const line = safeGitDiagnostic(input);
+      if (!line) return;
+      recentDiagnostics.push(line);
+      if (recentDiagnostics.length > 5) recentDiagnostics.shift();
+      reportResourceProgress(onProgress, active, "guides-git", line);
+    };
     const diagnostics = (async () => {
       const reader = child.stderr.getReader();
       const decoder = new TextDecoder();
@@ -153,17 +169,17 @@ function gitClient(directory: string, source: string, signal: AbortSignal, onPro
           pending += decoder.decode(value, { stream: true });
           const lines = pending.split(/[\r\n]/u);
           pending = lines.pop() ?? "";
-          for (const line of lines) if (line.trim()) reportResourceProgress(onProgress, active, "guides-git", line.trim().slice(0, 300));
+          for (const line of lines) reportDiagnostic(line);
           if (pending.length > 4096) pending = pending.slice(-4096);
         }
-        if (pending.trim()) reportResourceProgress(onProgress, active, "guides-git", pending.trim().slice(0, 300));
+        reportDiagnostic(pending);
       } catch { /* Diagnostics must not affect Git. */ }
       finally { reader.releaseLock(); }
     })();
     try {
       const [output, code] = await Promise.all([new Response(child.stdout).arrayBuffer(), child.exited, diagnostics]);
       active.throwIfAborted();
-      if (code !== 0 || output.byteLength > maxBuffer) throw new GuideSourceGitError(args[0] ?? "");
+      if (code !== 0 || output.byteLength > maxBuffer) throw new GuideSourceGitError(args.includes("fetch") ? "fetch" : args[0] ?? "", recentDiagnostics.join("\n").slice(-1500));
       return Buffer.from(output);
     } catch (error) {
       stop();
@@ -174,12 +190,27 @@ function gitClient(directory: string, source: string, signal: AbortSignal, onPro
       if (active.aborted) await clearGuideGitTransientFiles(directory);
     }
   };
+  return Object.assign(execute, { signal, onProgress });
 }
 
 const guideFetchOptions = ["--progress", "--no-tags", "--no-write-fetch-head", "--no-recurse-submodules", "--no-auto-maintenance",
   "--filter=blob:none"] as const;
-function fetchGuideObjects(git: ReturnType<typeof gitClient>, arguments_: readonly string[], stdin?: Uint8Array) {
-  return git(arguments_, stdin).catch(() => git(arguments_, stdin));
+async function fetchGuideObjects(git: ReturnType<typeof gitClient>, arguments_: readonly string[], signal: AbortSignal,
+  onProgress?: ResourceProgressCallback, stdin?: Uint8Array) {
+  const total = 3;
+  for (let attempt = 1; ; attempt++) {
+    signal.throwIfAborted();
+    try { return await git(arguments_, stdin); }
+    catch (error) {
+      signal.throwIfAborted();
+      if (!(error instanceof GuideSourceGitError) || attempt >= total) throw error;
+      const milliseconds = 500 * 3 ** (attempt - 1);
+      reportResourceProgress(onProgress, signal, "guides-git-retry", $t("team-resources.git-retry", {
+        attempt: attempt + 1, total, seconds: milliseconds / 1000,
+      }));
+      await delay(milliseconds, undefined, { signal });
+    }
+  }
 }
 
 export async function prepareGuideSourceGit(directory: string, source: string, signal: AbortSignal, onProgress?: ResourceProgressCallback) {
@@ -192,7 +223,7 @@ export async function prepareGuideSourceGit(directory: string, source: string, s
   await git(["remote", remotes.includes("origin") ? "set-url" : "add", "origin", source]);
   await git(["config", "remote.origin.promisor", "true"]);
   await git(["config", "remote.origin.partialclonefilter", "blob:none"]);
-  await fetchGuideObjects(git, ["fetch", ...guideFetchOptions, "--depth=1", "origin", `+${guideSourceRef}:${guideSourceRef}`]);
+  await fetchGuideObjects(git, ["fetch", ...guideFetchOptions, "--depth=1", "origin", `+${guideSourceRef}:${guideSourceRef}`], signal, onProgress);
   return git;
 }
 
@@ -206,7 +237,7 @@ export async function fetchGuideBlobs(git: ReturnType<typeof gitClient>, hashes:
   const ids = wanted.filter(hash => !available.has(hash));
   if (!ids.length) return;
   await fetchGuideObjects(git, ["-c", "fetch.negotiationAlgorithm=noop", "fetch", ...guideFetchOptions, "origin", "--stdin"],
-    Buffer.from(ids.join("\n") + "\n"));
+    git.signal, git.onProgress, Buffer.from(ids.join("\n") + "\n"));
 }
 
 export function createTeamResources(options: {

@@ -77,7 +77,7 @@ exec '${git}' "$@"
       signal: controller.signal, onProgress(event) { progress.push(event); } });
     const initial = make();
     await writeFile(fail, "");
-    await expect(initial.refresh()).rejects.toThrow("Git -c");
+    await expect(initial.refresh()).rejects.toThrow("Git fetch");
     expect(await initial.current()).toBeUndefined();
     expect(await make().initialized()).toBe(false);
     const sent = (await readFile(trace, "utf8")).trim().split("\n");
